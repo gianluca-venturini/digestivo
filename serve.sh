@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_DIR="/home/gianluca/digestivo"
+BASE_DIR="/home/gianluca/digestivo/hn"
 PORT=8000
 POLL_INTERVAL=10
 
