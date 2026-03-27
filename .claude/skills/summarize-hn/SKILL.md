@@ -78,7 +78,7 @@ Give each agent this prompt (filling in the post-specific values):
 >    - `summaryS`: 1-3 sentence summary. If content wasn't fetchable, infer from the title + HN comments.
 >    - `summaryM`: 3-10 sentence summary. If content wasn't fetchable, set to `"NA"`.
 >    - `summaryL`: 10-30 sentence summary. If content wasn't fetchable, set to `"NA"`.
-> 7. Write the result to `<WORKDIR>/posts/<POST_ID>.json` with these exact keys: `id`, `title`, `url`, `hn_url`, `domain`, `content`, `isContentFetched`, `summaryS`, `summaryM`, `summaryL`, `comments`. The `comments` array has objects with keys: `user`, `text`.
+> 7. Write the result to `<WORKDIR>/hn/posts/<POST_ID>.json` with these exact keys: `id`, `title`, `url`, `hn_url`, `domain`, `content`, `isContentFetched`, `summaryS`, `summaryM`, `summaryL`, `comments`. The `comments` array has objects with keys: `user`, `text`.
 >
 > Write ONLY valid JSON to the file — no markdown fences, no explanation.
 
