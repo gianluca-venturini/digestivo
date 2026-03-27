@@ -11,7 +11,7 @@ Build a complete HN digest for today. All intermediate data is JSON — no markd
 
 ## Step 1: Fetch the HN front page
 
-Use WebFetch on `https://news.ycombinator.com/` and extract every post. Save to `hn/<YYYY-MM-DD>/home.json`:
+Use WebFetch on `https://news.ycombinator.com/` and extract every post. Save to `hn/<YYYY-MM-DD-HH-MM>/home.json`:
 
 ```json
 [
@@ -88,7 +88,7 @@ After all agents finish, check which `post/<post_id>.json` files exist. If any a
 
 ## Step 3: Build the static HTML page
 
-Read `hn/<YYYY-MM-DD>/home.json` for the post order. For each post in order, read `posts/<post_id>.json`. Generate `hn/<YYYY-MM-DD>/index.html` — a single-file static page styled like Hacker News.
+Read `hn/<YYYY-MM-DD-HH-MM>/home.json` for the post order. For each post in order, read `posts/<post_id>.json`. Generate `hn/<YYYY-MM-DD-HH-MM>/index.html` — a single-file static page styled like Hacker News.
 
 ### Design rules
 
@@ -140,4 +140,4 @@ Read `hn/<YYYY-MM-DD>/home.json` for the post order. For each post in order, rea
 </div></td></tr>
 ```
 
-After writing `hn/<YYYY-MM-DD>/index.html`, open it with `open hn/<YYYY-MM-DD>/index.html`.
+After writing `hn/<YYYY-MM-DD-HH-MM>/index.html`, open it with `open hn/<YYYY-MM-DD-HH-MM>/index.html`.
