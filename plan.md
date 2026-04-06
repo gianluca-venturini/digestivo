@@ -134,9 +134,9 @@ const score =
   - [x] 5.1 `getComments(db, postId)` — SELECT WHERE postId = ?
   - [x] 5.2 `putComments(db, comments)` — INSERT OR IGNORE, in transaction
 
-- [ ] **6. `src/embedding.ts`** — Local embedding generation
-  - [ ] 6.1 Lazy-init singleton `feature-extraction` pipeline with `Xenova/all-MiniLM-L6-v2`
-  - [ ] 6.2 `embed(text): Promise<Float32Array>` — pooling=mean, normalize=true, 384-dim output
+- [x] **6. `src/embedding.ts`** — Local embedding generation
+  - [x] 6.1 Lazy-init singleton `feature-extraction` pipeline with `Xenova/all-MiniLM-L6-v2`
+  - [x] 6.2 `embed(text): Promise<Float32Array>` — pooling=mean, normalize=true, 384-dim output, dtype=q8 (quantized)
 
 - [ ] **7. `src/utils.ts`** — fetchSafe
   - [ ] 7.1 `fetchSafe(url): Promise<string>` cascade:
