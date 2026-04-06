@@ -138,16 +138,16 @@ const score =
   - [x] 6.1 Lazy-init singleton `feature-extraction` pipeline with `Xenova/all-MiniLM-L6-v2`
   - [x] 6.2 `embed(text): Promise<Float32Array>` — pooling=mean, normalize=true, 384-dim output, dtype=q8 (quantized)
 
-- [ ] **7. `src/utils.ts`** — fetchSafe
-  - [ ] 7.1 `fetchSafe(url): Promise<string>` cascade:
+- [x] **7. `src/utils.ts`** — fetchSafe
+  - [x] 7.1 `fetchSafe(url): Promise<string | null>` cascade:
     1. fetch() with browser headers + linkedom + Readability → `.textContent`
-    2. Fallback: Jina Reader `GET r.jina.ai/{url}` with `x-respond-with: text`
-    3. Both fail → return empty string (article stays null)
+    2. Fallback: Jina Reader `GET r.jina.ai/{url}` with `x-respond-with: text` + `JINA_API_KEY`
+    3. Both fail → return null
 
 - [ ] **8. `src/run.ts`** — CLI entry point (process.argv switch)
-  - [ ] 8.1 `get-posts-day <YYYY-MM-DD> <N>` — fetch N pages for day, putPosts, print count
-  - [ ] 8.2 `get-posts-days <start> <end> <N>` — iterate days inclusive, get-posts-day each
-  - [ ] 8.3 `get-upvoted-all` — read HN_USER/HN_COOKIE from env, getUpvoted (all pages), skip existing posts in DB, putPosts new ones, print new vs total
+  - [x] 8.1 `get-posts-day <YYYY-MM-DD> <N>` — fetch N pages for day, putPosts, print count
+  - [x] 8.2 `get-posts-days <start> <end> <N>` — iterate days inclusive, get-posts-day each
+  - [x] 8.3 `get-upvoted-all` — read HN_USER/HN_COOKIE from env, getUpvoted (all pages), update existing posts, putPosts new ones, print new vs total
   - [ ] 8.4 `post-fetch-article <postId>` — skip if article already set, fetchSafe → putPosts
   - [ ] 8.5 `post-compute-metadata <postId>` — extract domain (hostname minus www.), compute titleEmbedding + articleEmbedding if missing, putPosts
 
