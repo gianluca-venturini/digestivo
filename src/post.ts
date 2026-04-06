@@ -7,16 +7,18 @@ export function putPosts(db: Database, posts: Post[]): void {
   if (posts.length === 0) return;
 
   const upsert = db.prepare(`
-    INSERT INTO posts (id, title, article, url, byUser, time, domain, upvoted)
-    VALUES ($id, $title, $article, $url, $byUser, $time, $domain, $upvoted)
+    INSERT INTO posts (id, title, article, articleSummaryS, articleSummaryL, url, byUser, time, domain, upvoted)
+    VALUES ($id, $title, $article, $articleSummaryS, $articleSummaryL, $url, $byUser, $time, $domain, $upvoted)
     ON CONFLICT(id) DO UPDATE SET
-      title    = excluded.title,
-      article  = excluded.article,
-      url      = excluded.url,
-      byUser   = excluded.byUser,
-      time     = excluded.time,
-      domain   = excluded.domain,
-      upvoted  = excluded.upvoted
+      title           = excluded.title,
+      article         = excluded.article,
+      articleSummaryS = excluded.articleSummaryS,
+      articleSummaryL = excluded.articleSummaryL,
+      url             = excluded.url,
+      byUser          = excluded.byUser,
+      time            = excluded.time,
+      domain          = excluded.domain,
+      upvoted         = excluded.upvoted
   `);
 
   const run = db.transaction(() => {
@@ -25,6 +27,8 @@ export function putPosts(db: Database, posts: Post[]): void {
         $id: p.id,
         $title: p.title,
         $article: p.article,
+        $articleSummaryS: p.articleSummaryS,
+        $articleSummaryL: p.articleSummaryL,
         $url: p.url,
         $byUser: p.byUser,
         $time: p.time,

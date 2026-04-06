@@ -11,6 +11,8 @@ export function initDb(db: Database): void {
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       article TEXT,
+      articleSummaryS TEXT,
+      articleSummaryL TEXT,
       url TEXT NOT NULL,
       byUser TEXT NOT NULL,
       time TEXT NOT NULL,

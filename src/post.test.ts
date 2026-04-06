@@ -20,6 +20,8 @@ const makePost = (overrides: Partial<Post> = {}): Post => ({
   id: "1",
   title: "Test Post",
   article: null,
+  articleSummaryS: null,
+  articleSummaryL: null,
   url: "https://example.com",
   byUser: "alice",
   time: "2026-01-01T00:00:00",

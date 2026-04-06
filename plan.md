@@ -14,6 +14,8 @@
     - putComments(comments: Comment[]): void
 - embedding.ts: local embedding generation
     - embed(text: string): Promise<Float32Array> // generates 384-dim embedding using all-MiniLM-L6-v2
+- summarize.ts: article summarization via OpenRouter
+    - summarize(text: string, style: 'S' | 'L'): Promise<string> // S = 1-3 sentences, L = 10-30 sentences
 - utils.ts
     - fetchSafe(url: string): string // cascade: 1) fetch + @mozilla/readability + linkedom, 2) Jina Reader API (r.jina.ai)
 - run.ts: main entry point of the app, defines the various commands the user can run from CLI. Available commands are:
@@ -29,6 +31,8 @@
 ## .env
 HN_USER
 HN_COOKIE
+OPENROUTER_KEY
+OPENROUTER_MODEL
 
 
 ## Tables
@@ -36,6 +40,8 @@ HN_COOKIE
     - id: string
     - title: string
     - article: string | null // plaintext, fetched via fetchSafe cascade
+    - articleSummaryS: string | null // 1-3 sentence summary via OpenRouter
+    - articleSummaryL: string | null // 10-30 sentence summary via OpenRouter
     - url: string
     - byUser: string
     - time: IsoDateString
@@ -98,7 +104,7 @@ const score =
     - upvoted stored as INTEGER (0/1), embeddings in separate vec0 tables joined by post_id
 
 - [x] **2. `src/types.ts`** — Post and Comment interfaces
-  - Post: id, title, article, url, byUser, time (ISO), domain, upvoted, titleEmbedding (Float32Array|null), articleEmbedding (Float32Array|null)
+  - Post: id, title, article, articleSummaryS, articleSummaryL, url, byUser, time (ISO), domain, upvoted
   - Comment: id, postId, byUser, text
 
 - [x] **3. `src/hackernews.ts`** — HN HTML scraping
@@ -144,12 +150,24 @@ const score =
     2. Fallback: Jina Reader `GET r.jina.ai/{url}` with `x-respond-with: text` + `JINA_API_KEY`
     3. Both fail → return null
 
-- [ ] **8. `src/run.ts`** — CLI entry point (process.argv switch)
+- [x] **8. `src/summarize.ts`** — Article summarization via OpenRouter
+  - [x] 8.1 `summarize(text: string, style: 'S' | 'L'): Promise<string>`
+    - Plain `fetch()` to `https://openrouter.ai/api/v1/chat/completions` (OpenAI-compatible, easy to swap)
+    - Uses `OPENROUTER_KEY` for auth (Bearer token) and `OPENROUTER_MODEL` for model selection
+    - Style S: system prompt instructs 1-3 sentence summary (matches SKILL.md `summaryS`)
+    - Style L: system prompt instructs 10-30 sentence summary (matches SKILL.md `summaryL`)
+    - Returns the assistant message content as a string
+  - [ ] 8.2 Integrate into `post-compute-metadata`:
+    - After article fetch, if `articleSummaryS` is null and article is not null: generate S summary
+    - Same for `articleSummaryL`
+    - Save via `putPosts`
+
+- [x] **9. `src/run.ts`** — CLI entry point (process.argv switch)
   - [x] 8.1 `get-posts-day <YYYY-MM-DD> <N>` — fetch N pages for day, putPosts, print count
   - [x] 8.2 `get-posts-days <start> <end> <N>` — iterate days inclusive, get-posts-day each
   - [x] 8.3 `get-upvoted-all` — read HN_USER/HN_COOKIE from env, getUpvoted (all pages), update existing posts, putPosts new ones, print new vs total
-  - [ ] 8.4 `post-fetch-article <postId>` — skip if article already set, fetchSafe → putPosts
-  - [ ] 8.5 `post-compute-metadata <postId>` — extract domain (hostname minus www.), compute titleEmbedding + articleEmbedding if missing, putPosts
+  - [x] 8.4 `post-fetch-article <postId>` — skip if article already set, fetchSafe → putPosts
+  - [x] 8.5 `post-compute-metadata <postId>` — extract domain (hostname minus www.), compute titleEmbedding + articleEmbedding if missing, putPosts
 
 - [ ] **9. `src/index.ts`** — API backend (Bun.serve)
   - [ ] 9.1 `POST /score` — input: `{ posts: Post[] }` (minimal: id, title, url, byUser)

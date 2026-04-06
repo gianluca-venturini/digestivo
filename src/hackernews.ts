@@ -12,7 +12,7 @@ const HEADERS = {
 
 async function fetchHtml(url: string, cookie?: string): Promise<string> {
   const headers: Record<string, string> = { ...HEADERS };
-  if (cookie) headers["Cookie"] = cookie;
+  if (cookie) headers["Cookie"] = `user=${cookie}`;
   const res = await fetch(url, { headers });
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
   return res.text();
@@ -55,10 +55,10 @@ export function parsePosts(html: string, upvoted = false): Post[] {
       byUser,
       time,
       article: null,
+      articleSummaryS: null,
+      articleSummaryL: null,
       domain: null,
       upvoted,
-      titleEmbedding: null,
-      articleEmbedding: null,
     });
   }
 

@@ -5,8 +5,7 @@
   "private": true,
   "scripts": {
     "test": "bun test --max-concurrency=1 --preload ./src/test-setup.ts",
-    "get-posts-day": "bun src/run.ts get-posts-day",
-    "get-posts-days": "bun src/run.ts get-posts-days"
+    "cmd": "bun src/run.ts"
   },
   "devDependencies": {
     "@types/bun": "latest"
