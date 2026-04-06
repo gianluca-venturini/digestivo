@@ -112,14 +112,20 @@ export async function cmdPostComputeMetadata(
 
   // Article summaries
   if (post.article && !post.articleSummaryS) {
-    post = { ...post, articleSummaryS: await summarizer(post.article, "S") };
-    putPosts(db, [post]);
-    computed.push("articleSummaryS");
+    const summaryS = await summarizer(post.article, "S");
+    if (summaryS) {
+      post = { ...post, articleSummaryS: summaryS };
+      putPosts(db, [post]);
+      computed.push("articleSummaryS");
+    }
   }
   if (post.article && !post.articleSummaryL) {
-    post = { ...post, articleSummaryL: await summarizer(post.article, "L") };
-    putPosts(db, [post]);
-    computed.push("articleSummaryL");
+    const summaryL = await summarizer(post.article, "L");
+    if (summaryL) {
+      post = { ...post, articleSummaryL: summaryL };
+      putPosts(db, [post]);
+      computed.push("articleSummaryL");
+    }
   }
 
   // Title embedding

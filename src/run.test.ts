@@ -209,7 +209,7 @@ describe("run", () => {
     const mockFetcher = async (_url: string): Promise<string | null> =>
       "Fetched article text.";
     const mockFetcherNull = async (_url: string): Promise<string | null> => null;
-    const mockSummarize = async (_text: string, style: "S" | "L"): Promise<string> =>
+    const mockSummarize = async (_text: string, style: "S" | "L"): Promise<string | null> =>
       style === "S" ? "Short summary." : "Long summary.";
 
     it("extracts domain from url", async () => {
@@ -293,7 +293,7 @@ describe("run", () => {
     it("skips summaries when already set", async () => {
       putPosts(db, [{ ...makePost("p1"), article: "text", articleSummaryS: "existing S", articleSummaryL: "existing L" }]);
       const callCount = { n: 0 };
-      const trackingSummarize = async (text: string, style: "S" | "L") => {
+      const trackingSummarize = async (text: string, style: "S" | "L"): Promise<string | null> => {
         callCount.n++;
         return mockSummarize(text, style);
       };

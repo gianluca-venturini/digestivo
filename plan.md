@@ -157,7 +157,7 @@ const score =
     - Style S: system prompt instructs 1-3 sentence summary (matches SKILL.md `summaryS`)
     - Style L: system prompt instructs 10-30 sentence summary (matches SKILL.md `summaryL`)
     - Returns the assistant message content as a string
-  - [ ] 8.2 Integrate into `post-compute-metadata`:
+  - [x] 8.2 Integrate into `post-compute-metadata`:
     - After article fetch, if `articleSummaryS` is null and article is not null: generate S summary
     - Same for `articleSummaryL`
     - Save via `putPosts`
