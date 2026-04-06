@@ -33,7 +33,7 @@ export async function summarize(
   }
 
   const json = (await res.json()) as { choices: { message: { content: string } }[] };
-  if (!json.choices[0].message.content) {
+  if (!json.choices[0]?.message?.content) {
     console.error(`[summarize] OpenRouter returned empty content for ${text}`);
     return null;
   }
