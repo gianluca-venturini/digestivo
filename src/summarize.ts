@@ -6,7 +6,7 @@ const PROMPTS: Record<"S" | "L", string> = {
 export async function summarize(
   text: string,
   style: "S" | "L"
-): Promise<string> {
+): Promise<string | null> {
   const key = process.env["OPENROUTER_KEY"];
   const mdl = process.env["OPENROUTER_MODEL"];
   if (!key) throw new Error("OPENROUTER_KEY is required");
@@ -32,6 +32,10 @@ export async function summarize(
     throw new Error(`OpenRouter ${res.status}: ${body}`);
   }
 
-  const json = await res.json();
-  return json.choices[0].message.content;
+  const json = (await res.json()) as { choices: { message: { content: string } }[] };
+  if (!json.choices[0].message.content) {
+    console.error(`[summarize] OpenRouter returned empty content for ${text}`);
+    return null;
+  }
+  return json.choices[0]!!!.message.content;
 }
