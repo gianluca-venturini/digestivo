@@ -97,39 +97,42 @@ const score =
     - `comments` table (id, postId FK, byUser, text)
     - upvoted stored as INTEGER (0/1), embeddings in separate vec0 tables joined by post_id
 
-- [ ] **2. `src/types.ts`** — Post and Comment interfaces
+- [x] **2. `src/types.ts`** — Post and Comment interfaces
   - Post: id, title, article, url, byUser, time (ISO), domain, upvoted, titleEmbedding (Float32Array|null), articleEmbedding (Float32Array|null)
   - Comment: id, postId, byUser, text
 
-- [ ] **3. `src/hackernews.ts`** — HN HTML scraping
-  - [ ] 3.1 `parsePosts(html): Post[]` — shared parser for listing pages
+- [x] **3. `src/hackernews.ts`** — HN HTML scraping
+  - [x] 3.1 `parsePosts(html): Post[]` — shared parser for listing pages
     - `tr.athing.submission` → id, title (`.titleline > a`), url (href)
     - Next sibling row → byUser (`a.hnuser`), time (`.age[title]` ISO part)
     - Self-posts: store url as `https://news.ycombinator.com/item?id={id}`
     - Domain not extracted here (done in post-compute-metadata)
     - Default: upvoted=false, embeddings=null
-  - [ ] 3.2 `getPage(day, pageNumber): Post[]`
+  - [x] 3.2 `getPage(day, pageNumber): Post[]`
     - day=null → `news.ycombinator.com/news?p={pageNumber}`
     - day set → `news.ycombinator.com/front?day={day}&p={pageNumber}`
-  - [ ] 3.3 `getUpvoted(user, cookie): Post[]`
+  - [x] 3.3 `getUpvoted(user, cookie): Post[]`
     - Fetch `/upvoted?id={user}` with Cookie header
     - Set upvoted=true on all parsed posts
     - Follow `a.morelink` pagination until exhausted
-  - [ ] 3.4 `getComments(postId): Comment[]`
+  - [x] 3.4 `getComments(postId): Comment[]`
     - Fetch `/item?id={postId}`, parse `tr.athing.comtr`
     - Only top-level: `td.ind[indent]="0"`
     - Extract id, byUser (`a.hnuser`), text (`.commtext` → plaintext)
 
-- [ ] **4. `src/post.ts`** — Post CRUD + vector search
-  - [ ] 4.1 `putPosts(posts)` — upsert posts table + vec tables (DELETE+INSERT for vec0), wrapped in transaction
-  - [ ] 4.2 `getPost(id)` — SELECT + LEFT JOIN both vec tables
-  - [ ] 4.3 `getPosts(ids)` — same with `WHERE id IN (...)`
-  - [ ] 4.4 `getPostsTitleSimilar(embedding, k)` — KNN on vec_title_embeddings (MATCH + k), over-fetch + filter upvoted=1 in JS
-  - [ ] 4.5 `getPostsArticleSimilar(embedding, k)` — same against vec_article_embeddings
+- [x] **4. `src/post.ts`** — Post CRUD + vector search
+  - [x] 4.1 `putPosts(db, posts)` — upsert posts table, wrapped in transaction
+  - [x] 4.1 `putTitleEmbedding(db, postId, embedding)` / `putArticleEmbedding(db, postId, embedding)` — DELETE+INSERT into vec0 tables
+  - [x] 4.2 `getPost(db, id)` — SELECT from posts, boolean coerce upvoted
+  - [x] 4.3 `getPosts(db, ids)` — same with `WHERE id IN (...)`
+  - [x] 4.3 `hasTitleEmbedding(db, postId)` / `hasArticleEmbedding(db, postId)` — existence checks
+  - [x] 4.4 `getPostsTitleSimilar(db, embedding, k)` — KNN on vec_title_embeddings (MATCH + k), over-fetch + filter upvoted=1 in JS
+  - [x] 4.5 `getPostsArticleSimilar(db, embedding, k)` — same against vec_article_embeddings
+  - Note: db.ts refactored to export `initDb(db)` only; caller constructs the Database instance (tests use :memory:)
 
-- [ ] **5. `src/comments.ts`** — Comment CRUD
-  - [ ] 5.1 `getComments(postId)` — SELECT WHERE postId = ?
-  - [ ] 5.2 `putComments(comments)` — INSERT OR IGNORE, in transaction
+- [x] **5. `src/comments.ts`** — Comment CRUD
+  - [x] 5.1 `getComments(db, postId)` — SELECT WHERE postId = ?
+  - [x] 5.2 `putComments(db, comments)` — INSERT OR IGNORE, in transaction
 
 - [ ] **6. `src/embedding.ts`** — Local embedding generation
   - [ ] 6.1 Lazy-init singleton `feature-extraction` pipeline with `Xenova/all-MiniLM-L6-v2`
