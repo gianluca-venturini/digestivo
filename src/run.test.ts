@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { initDb } from "./db.ts";
-import { cmdGetPostsDay, cmdGetPostsDays, cmdGetUpvotedAll, cmdPostFetchArticle, cmdPostComputeMetadata } from "./run.ts";
+import { cmdGetPostsDay, cmdGetPostsDays, cmdGetUpvotedAll, cmdPostFetchArticle, cmdPostComputeMetadata, cmdGetPost } from "./run.ts";
 import { getPosts } from "./post.ts";
 import { getPost, putPosts, hasTitleEmbedding, hasArticleEmbedding } from "./post.ts";
 import type { Post } from "./types.ts";
@@ -200,6 +200,51 @@ describe("run", () => {
       putPosts(db, [makePost("p1")]);
       await cmdPostFetchArticle(db, "p1", mockFetchSafeNull);
       expect(getPost(db, "p1")!.article).toBeNull();
+    });
+  });
+
+  describe("get-post", () => {
+    const mockHnFetcher = async (id: string) => makePost(id);
+    const mockEmbed = async (_text: string): Promise<Float32Array> =>
+      new Float32Array(384).fill(0.5);
+    const mockFetchSafe = async (_url: string): Promise<string | null> =>
+      "Article content.";
+    const mockFetchSafeNull = async (_url: string): Promise<string | null> => null;
+    const mockSummarize = async (_text: string, style: "S" | "L"): Promise<string | null> =>
+      style === "S" ? "Short summary." : "Long summary.";
+
+    it("fetches from HN and saves the post", async () => {
+      await cmdGetPost(db, "42", mockHnFetcher, mockEmbed, mockFetchSafeNull, mockSummarize);
+      expect(getPost(db, "42")).not.toBeNull();
+    });
+
+    it("saves title and url from HN fetcher", async () => {
+      await cmdGetPost(db, "42", mockHnFetcher, mockEmbed, mockFetchSafeNull, mockSummarize);
+      const post = getPost(db, "42")!;
+      expect(post.title).toBe("Post 42");
+      expect(post.url).toBe("https://example.com/42");
+    });
+
+    it("computes metadata (article, summaries, embeddings)", async () => {
+      await cmdGetPost(db, "42", mockHnFetcher, mockEmbed, mockFetchSafe, mockSummarize);
+      const post = getPost(db, "42")!;
+      expect(post.article).toBe("Article content.");
+      expect(post.articleSummaryS).toBe("Short summary.");
+      expect(post.articleSummaryL).toBe("Long summary.");
+      expect(hasTitleEmbedding(db, "42")).toBe(true);
+      expect(hasArticleEmbedding(db, "42")).toBe(true);
+    });
+
+    it("is idempotent — running twice does not duplicate or reset", async () => {
+      await cmdGetPost(db, "42", mockHnFetcher, mockEmbed, mockFetchSafe, mockSummarize);
+      const embedCallCount = { n: 0 };
+      await cmdGetPost(db, "42", mockHnFetcher, async (text) => {
+        embedCallCount.n++;
+        return mockEmbed(text);
+      }, mockFetchSafe, mockSummarize);
+      expect(embedCallCount.n).toBe(0);
+      const count = db.query<{ n: number }, []>("SELECT COUNT(*) as n FROM posts").get()!.n;
+      expect(count).toBe(1);
     });
   });
 

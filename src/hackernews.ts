@@ -102,6 +102,35 @@ export async function getUpvoted(
   return all;
 }
 
+const HN_API = "https://hacker-news.firebaseio.com/v0";
+
+export async function getPostById(id: string): Promise<Post> {
+  const res = await fetch(`${HN_API}/item/${id}.json`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching item ${id}`);
+  const item = await res.json() as {
+    id: number;
+    title?: string;
+    url?: string;
+    by?: string;
+    time?: number;
+    type?: string;
+  };
+  if (!item || item.type !== "story") throw new Error(`Item ${id} is not a story`);
+  const url = item.url ?? `${BASE}/item?id=${id}`;
+  return {
+    id: String(item.id),
+    title: item.title ?? "",
+    url,
+    byUser: item.by ?? "",
+    time: item.time ? new Date(item.time * 1000).toISOString().replace("Z", "") : "",
+    article: null,
+    articleSummaryS: null,
+    articleSummaryL: null,
+    domain: null,
+    upvoted: false,
+  };
+}
+
 export async function getComments(postId: string): Promise<Comment[]> {
   const html = await fetchHtml(`${BASE}/item?id=${postId}`);
   const { document } = parseHTML(html);

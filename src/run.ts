@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { initDb } from "./db.ts";
-import { getPage, getUpvoted } from "./hackernews.ts";
+import { getPage, getUpvoted, getPostById } from "./hackernews.ts";
 import { getPost, putPosts, hasTitleEmbedding, hasArticleEmbedding, putTitleEmbedding, putArticleEmbedding } from "./post.ts";
 import { fetchSafe } from "./utils.ts";
 import { embed } from "./embedding.ts";
@@ -147,6 +147,20 @@ export async function cmdPostComputeMetadata(
   }
 }
 
+export async function cmdGetPost(
+  db: Database,
+  postId: string,
+  hnFetcher: typeof getPostById = getPostById,
+  embedder: typeof embed = embed,
+  fetcher: typeof fetchSafe = fetchSafe,
+  summarizer: typeof summarize = summarize
+): Promise<void> {
+  const post = await hnFetcher(postId);
+  putPosts(db, [post]);
+  console.log(`get-post ${postId}: saved post "${post.title}"`);
+  await cmdPostComputeMetadata(db, postId, embedder, fetcher, summarizer);
+}
+
 export const commands: Record<string, (db: Database, ...args: string[]) => Promise<void>> = {
   async "get-posts-day"(db, dayArg, nArg) {
     const day = dayArg;
@@ -182,6 +196,14 @@ export const commands: Record<string, (db: Database, ...args: string[]) => Promi
       process.exit(1);
     }
     await cmdGetUpvotedAll(db, user, cookie);
+  },
+
+  async "get-post"(db, postIdArg) {
+    if (!postIdArg) {
+      console.error("Usage: get-post <postId>");
+      process.exit(1);
+    }
+    await cmdGetPost(db, postIdArg);
   },
 
   async "get-posts-days"(db, startArg, endArg, nArg) {
