@@ -1,5 +1,6 @@
 import { Database } from "bun:sqlite";
 import { initDb } from "./db.ts";
+import type { Post } from "./types.ts";
 import { getPage, getUpvoted, getPostById } from "./hackernews.ts";
 import { getPost, putPosts, hasTitleEmbedding, hasArticleEmbedding, putTitleEmbedding, putArticleEmbedding } from "./post.ts";
 import { fetchSafe } from "./utils.ts";
@@ -83,7 +84,7 @@ export async function cmdPostComputeMetadata(
   embedder: typeof embed = embed,
   fetcher: typeof fetchSafe = fetchSafe,
   summarizer: typeof summarize = summarize
-): Promise<void> {
+): Promise<Post> {
   let post = getPost(db, postId);
   if (!post) {
     console.error(`post-compute-metadata: post ${postId} not found`);
@@ -145,20 +146,23 @@ export async function cmdPostComputeMetadata(
   } else {
     console.log(`post-compute-metadata ${postId}: computed ${computed.join(", ")}`);
   }
+  return post;
 }
 
-export async function cmdGetPost(
+export async function cmdPostGetComputeMetadata(
   db: Database,
   postId: string,
   hnFetcher: typeof getPostById = getPostById,
   embedder: typeof embed = embed,
   fetcher: typeof fetchSafe = fetchSafe,
   summarizer: typeof summarize = summarize
-): Promise<void> {
-  const post = await hnFetcher(postId);
-  putPosts(db, [post]);
-  console.log(`get-post ${postId}: saved post "${post.title}"`);
-  await cmdPostComputeMetadata(db, postId, embedder, fetcher, summarizer);
+): Promise<Post> {
+  if (!getPost(db, postId)) {
+    const post = await hnFetcher(postId);
+    putPosts(db, [post]);
+    console.log(`post-get-compute-metadata ${postId}: saved post "${post.title}"`);
+  }
+  return await cmdPostComputeMetadata(db, postId, embedder, fetcher, summarizer);
 }
 
 export const commands: Record<string, (db: Database, ...args: string[]) => Promise<void>> = {
@@ -198,12 +202,12 @@ export const commands: Record<string, (db: Database, ...args: string[]) => Promi
     await cmdGetUpvotedAll(db, user, cookie);
   },
 
-  async "get-post"(db, postIdArg) {
+  async "post-get-compute-metadata"(db, postIdArg) {
     if (!postIdArg) {
-      console.error("Usage: get-post <postId>");
+      console.error("Usage: post-get-compute-metadata <postId>");
       process.exit(1);
     }
-    await cmdGetPost(db, postIdArg);
+    await cmdPostGetComputeMetadata(db, postIdArg);
   },
 
   async "get-posts-days"(db, startArg, endArg, nArg) {

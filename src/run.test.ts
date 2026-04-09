@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { initDb } from "./db.ts";
-import { cmdGetPostsDay, cmdGetPostsDays, cmdGetUpvotedAll, cmdPostFetchArticle, cmdPostComputeMetadata, cmdGetPost } from "./run.ts";
+import { cmdGetPostsDay, cmdGetPostsDays, cmdGetUpvotedAll, cmdPostFetchArticle, cmdPostComputeMetadata, cmdPostGetComputeMetadata } from "./run.ts";
 import { getPosts } from "./post.ts";
 import { getPost, putPosts, hasTitleEmbedding, hasArticleEmbedding } from "./post.ts";
 import type { Post } from "./types.ts";
@@ -203,7 +203,7 @@ describe("run", () => {
     });
   });
 
-  describe("get-post", () => {
+  describe("post-get-compute-metadata", () => {
     const mockHnFetcher = async (id: string) => makePost(id);
     const mockEmbed = async (_text: string): Promise<Float32Array> =>
       new Float32Array(384).fill(0.5);
@@ -214,19 +214,19 @@ describe("run", () => {
       style === "S" ? "Short summary." : "Long summary.";
 
     it("fetches from HN and saves the post", async () => {
-      await cmdGetPost(db, "42", mockHnFetcher, mockEmbed, mockFetchSafeNull, mockSummarize);
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockEmbed, mockFetchSafeNull, mockSummarize);
       expect(getPost(db, "42")).not.toBeNull();
     });
 
     it("saves title and url from HN fetcher", async () => {
-      await cmdGetPost(db, "42", mockHnFetcher, mockEmbed, mockFetchSafeNull, mockSummarize);
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockEmbed, mockFetchSafeNull, mockSummarize);
       const post = getPost(db, "42")!;
       expect(post.title).toBe("Post 42");
       expect(post.url).toBe("https://example.com/42");
     });
 
     it("computes metadata (article, summaries, embeddings)", async () => {
-      await cmdGetPost(db, "42", mockHnFetcher, mockEmbed, mockFetchSafe, mockSummarize);
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockEmbed, mockFetchSafe, mockSummarize);
       const post = getPost(db, "42")!;
       expect(post.article).toBe("Article content.");
       expect(post.articleSummaryS).toBe("Short summary.");
@@ -235,10 +235,20 @@ describe("run", () => {
       expect(hasArticleEmbedding(db, "42")).toBe(true);
     });
 
+    it("skips HN fetch if post already in db", async () => {
+      putPosts(db, [makePost("42")]);
+      const hnCallCount = { n: 0 };
+      await cmdPostGetComputeMetadata(db, "42", async (id) => {
+        hnCallCount.n++;
+        return mockHnFetcher(id);
+      }, mockEmbed, mockFetchSafeNull, mockSummarize);
+      expect(hnCallCount.n).toBe(0);
+    });
+
     it("is idempotent — running twice does not duplicate or reset", async () => {
-      await cmdGetPost(db, "42", mockHnFetcher, mockEmbed, mockFetchSafe, mockSummarize);
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockEmbed, mockFetchSafe, mockSummarize);
       const embedCallCount = { n: 0 };
-      await cmdGetPost(db, "42", mockHnFetcher, async (text) => {
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, async (text) => {
         embedCallCount.n++;
         return mockEmbed(text);
       }, mockFetchSafe, mockSummarize);
