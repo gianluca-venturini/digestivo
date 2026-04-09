@@ -40,7 +40,11 @@ function makeSummaryDiv() {
   return div;
 }
 
-async function onToggle(id, style, btn, defaultLabel, summaryDiv) {
+async function onToggle(id, style, btn, defaultLabel, summaryDiv, otherBtn, otherDefaultLabel, otherSummaryDiv) {
+  // Close the other section
+  otherSummaryDiv.hidden = true;
+  otherBtn.textContent = otherDefaultLabel;
+
   // Toggle off if already showing
   if (!summaryDiv.hidden) {
     summaryDiv.hidden = true;
