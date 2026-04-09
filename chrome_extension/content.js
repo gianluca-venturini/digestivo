@@ -1,3 +1,5 @@
+const DEFAULT_BASE_URI = "http://localhost:3001";
+
 document.addEventListener("DOMContentLoaded", init);
 if (document.readyState !== "loading") init();
 
@@ -63,7 +65,8 @@ async function onToggle(id, style, btn, defaultLabel, summaryDiv, otherBtn, othe
   btn.disabled = true;
 
   try {
-    const res = await fetch(`http://localhost:3001/post/${id}`, { method: "POST" });
+    const { baseUri = DEFAULT_BASE_URI } = await chrome.storage.sync.get("baseUri");
+    const res = await fetch(`${baseUri}/post/${id}`, { method: "POST" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const post = await res.json();
 

@@ -3,11 +3,15 @@
   "name": "HN Post Summarizer",
   "version": "1.0.0",
   "description": "Adds inline AI summaries to Hacker News posts.",
-  "permissions": ["activeTab"],
+  "permissions": ["activeTab", "storage"],
   "host_permissions": [
     "https://news.ycombinator.com/*",
     "http://localhost:3001/*"
   ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "HN Post Summarizer"
+  },
   "content_scripts": [
     {
       "matches": ["https://news.ycombinator.com/*"],
