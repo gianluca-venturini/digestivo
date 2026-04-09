@@ -27,7 +27,7 @@ app.post("/post/:id", async (c) => {
   return c.json(post);
 });
 
-export default app;
+export { app };
 
 const port = Number(process.env["PORT"] ?? 3001);
 Bun.serve({ fetch: app.fetch, port, hostname: "127.0.0.1", idleTimeout: 120 });
