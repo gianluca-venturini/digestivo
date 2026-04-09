@@ -30,5 +30,5 @@ app.post("/post/:id", async (c) => {
 export default app;
 
 const port = Number(process.env["PORT"] ?? 3001);
-Bun.serve({ fetch: app.fetch, port, idleTimeout: 120 });
-console.log(`API listening on http://localhost:${port}`);
+Bun.serve({ fetch: app.fetch, port, hostname: "0.0.0.0", idleTimeout: 120 });
+console.log(`API listening on http://0.0.0.0:${port}`);

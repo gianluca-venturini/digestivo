@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-exec bun src/api.ts
+exec NODE_ENV=production bun src/api.ts
