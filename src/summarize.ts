@@ -1,6 +1,6 @@
 const PROMPTS: Record<"S" | "L", string> = {
-  S: "Summarize the following article in 1-3 sentences. Be concise and capture the key point.",
-  L: "Summarize the following article in 10-30 sentences. Cover the main points, arguments, and conclusions in detail.",
+  S: "Summarize the following article in 1-2 plaintext sentences. Be concise and capture the key point.",
+  L: "Summarize the following article in 5-15 plaintext sentences. Cover the main points, arguments, and conclusions in detail.",
 };
 
 export async function summarize(
