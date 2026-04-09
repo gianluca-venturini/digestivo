@@ -3,13 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SERVICE_NAME="digestivo-serve"
-
-# Copy the serve script
-sudo cp "$SCRIPT_DIR/serve.sh" /usr/local/bin/digestivo-serve.sh
-sudo chmod +x /usr/local/bin/digestivo-serve.sh
+BUN_PATH="$(which bun)"
 
 # Create systemd unit
-sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null <<'EOF'
+sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null <<EOF
 [Unit]
 Description=Serve latest HN digest via Tailscale
 After=network-online.target tailscaled.service
@@ -17,7 +14,10 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/digestivo-serve.sh
+User=$(whoami)
+WorkingDirectory=$SCRIPT_DIR
+ExecStartPre=/usr/bin/tailscale serve --bg --https=3000 http://localhost:3001
+ExecStart=$BUN_PATH $SCRIPT_DIR/src/api.ts
 Restart=on-failure
 RestartSec=5
 
