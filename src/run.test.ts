@@ -2,8 +2,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { Database } from "bun:sqlite";
 import { initDb } from "./db.ts";
 import { cmdGetPostsDay, cmdGetPostsDays, cmdGetUpvotedAll, cmdPostFetchArticle, cmdPostComputeMetadata, cmdPostGetComputeMetadata } from "./run.ts";
-import { getPosts } from "./post.ts";
-import { getPost, putPosts, hasTitleEmbedding, hasArticleEmbedding } from "./post.ts";
+import { getPost, putPosts, getPosts } from "./post.ts";
 import type { Post } from "./types.ts";
 
 const makePost = (id: string): Post => ({
@@ -205,8 +204,6 @@ describe("run", () => {
 
   describe("post-get-compute-metadata", () => {
     const mockHnFetcher = async (id: string) => makePost(id);
-    const mockEmbed = async (_text: string): Promise<Float32Array> =>
-      new Float32Array(384).fill(0.5);
     const mockFetchSafe = async (_url: string): Promise<string | null> =>
       "Article content.";
     const mockFetchSafeNull = async (_url: string): Promise<string | null> => null;
@@ -214,25 +211,23 @@ describe("run", () => {
       style === "S" ? "Short summary." : "Long summary.";
 
     it("fetches from HN and saves the post", async () => {
-      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockEmbed, mockFetchSafeNull, mockSummarize);
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockFetchSafeNull, mockSummarize);
       expect(getPost(db, "42")).not.toBeNull();
     });
 
     it("saves title and url from HN fetcher", async () => {
-      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockEmbed, mockFetchSafeNull, mockSummarize);
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockFetchSafeNull, mockSummarize);
       const post = getPost(db, "42")!;
       expect(post.title).toBe("Post 42");
       expect(post.url).toBe("https://example.com/42");
     });
 
-    it("computes metadata (article, summaries, embeddings)", async () => {
-      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockEmbed, mockFetchSafe, mockSummarize);
+    it("computes metadata (article, summaries)", async () => {
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockFetchSafe, mockSummarize);
       const post = getPost(db, "42")!;
       expect(post.article).toBe("Article content.");
       expect(post.articleSummaryS).toBe("Short summary.");
       expect(post.articleSummaryL).toBe("Long summary.");
-      expect(hasTitleEmbedding(db, "42")).toBe(true);
-      expect(hasArticleEmbedding(db, "42")).toBe(true);
     });
 
     it("skips HN fetch if post already in db", async () => {
@@ -241,26 +236,19 @@ describe("run", () => {
       await cmdPostGetComputeMetadata(db, "42", async (id) => {
         hnCallCount.n++;
         return mockHnFetcher(id);
-      }, mockEmbed, mockFetchSafeNull, mockSummarize);
+      }, mockFetchSafeNull, mockSummarize);
       expect(hnCallCount.n).toBe(0);
     });
 
-    it("is idempotent — running twice does not duplicate or reset", async () => {
-      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockEmbed, mockFetchSafe, mockSummarize);
-      const embedCallCount = { n: 0 };
-      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, async (text) => {
-        embedCallCount.n++;
-        return mockEmbed(text);
-      }, mockFetchSafe, mockSummarize);
-      expect(embedCallCount.n).toBe(0);
+    it("is idempotent — running twice does not duplicate", async () => {
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockFetchSafe, mockSummarize);
+      await cmdPostGetComputeMetadata(db, "42", mockHnFetcher, mockFetchSafe, mockSummarize);
       const count = db.query<{ n: number }, []>("SELECT COUNT(*) as n FROM posts").get()!.n;
       expect(count).toBe(1);
     });
   });
 
   describe("post-compute-metadata", () => {
-    const mockEmbed = async (_text: string): Promise<Float32Array> =>
-      new Float32Array(384).fill(0.5);
     const mockFetcher = async (_url: string): Promise<string | null> =>
       "Fetched article text.";
     const mockFetcherNull = async (_url: string): Promise<string | null> => null;
@@ -269,26 +257,26 @@ describe("run", () => {
 
     it("extracts domain from url", async () => {
       putPosts(db, [makePost("p1")]);
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcherNull, mockSummarize);
+      await cmdPostComputeMetadata(db, "p1", mockFetcherNull, mockSummarize);
       expect(getPost(db, "p1")!.domain).toBe("example.com");
     });
 
     it("strips www. prefix from domain", async () => {
       putPosts(db, [{ ...makePost("p1"), url: "https://www.example.com/article" }]);
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcherNull, mockSummarize);
+      await cmdPostComputeMetadata(db, "p1", mockFetcherNull, mockSummarize);
       expect(getPost(db, "p1")!.domain).toBe("example.com");
     });
 
     it("fetches article when missing", async () => {
       putPosts(db, [makePost("p1")]); // article is null
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcher, mockSummarize);
+      await cmdPostComputeMetadata(db, "p1", mockFetcher, mockSummarize);
       expect(getPost(db, "p1")!.article).toBe("Fetched article text.");
     });
 
     it("skips article fetch when already set", async () => {
       putPosts(db, [{ ...makePost("p1"), article: "existing" }]);
       const callCount = { n: 0 };
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, async (_url) => {
+      await cmdPostComputeMetadata(db, "p1", async (_url) => {
         callCount.n++;
         return "new";
       }, mockSummarize);
@@ -296,42 +284,9 @@ describe("run", () => {
       expect(getPost(db, "p1")!.article).toBe("existing");
     });
 
-    it("computes title embedding", async () => {
-      putPosts(db, [makePost("p1")]);
-      expect(hasTitleEmbedding(db, "p1")).toBe(false);
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcherNull, mockSummarize);
-      expect(hasTitleEmbedding(db, "p1")).toBe(true);
-    });
-
-    it("computes article embedding after fetching article", async () => {
-      putPosts(db, [makePost("p1")]); // article is null
-      expect(hasArticleEmbedding(db, "p1")).toBe(false);
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcher, mockSummarize);
-      expect(hasArticleEmbedding(db, "p1")).toBe(true);
-    });
-
-    it("skips article embedding when article fetch fails", async () => {
-      putPosts(db, [makePost("p1")]);
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcherNull, mockSummarize);
-      expect(hasArticleEmbedding(db, "p1")).toBe(false);
-    });
-
-    it("is idempotent — does not re-embed if already computed", async () => {
-      putPosts(db, [makePost("p1")]);
-      const callCount = { n: 0 };
-      const trackingEmbed = async (text: string) => {
-        callCount.n++;
-        return mockEmbed(text);
-      };
-      await cmdPostComputeMetadata(db, "p1", trackingEmbed, mockFetcherNull, mockSummarize);
-      const firstCount = callCount.n;
-      await cmdPostComputeMetadata(db, "p1", trackingEmbed, mockFetcherNull, mockSummarize);
-      expect(callCount.n).toBe(firstCount);
-    });
-
     it("generates article summaries when article is present", async () => {
       putPosts(db, [makePost("p1")]);
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcher, mockSummarize);
+      await cmdPostComputeMetadata(db, "p1", mockFetcher, mockSummarize);
       const post = getPost(db, "p1")!;
       expect(post.articleSummaryS).toBe("Short summary.");
       expect(post.articleSummaryL).toBe("Long summary.");
@@ -339,7 +294,7 @@ describe("run", () => {
 
     it("skips summaries when article is null", async () => {
       putPosts(db, [makePost("p1")]);
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcherNull, mockSummarize);
+      await cmdPostComputeMetadata(db, "p1", mockFetcherNull, mockSummarize);
       const post = getPost(db, "p1")!;
       expect(post.articleSummaryS).toBeNull();
       expect(post.articleSummaryL).toBeNull();
@@ -352,7 +307,7 @@ describe("run", () => {
         callCount.n++;
         return mockSummarize(text, style);
       };
-      await cmdPostComputeMetadata(db, "p1", mockEmbed, mockFetcherNull, trackingSummarize);
+      await cmdPostComputeMetadata(db, "p1", mockFetcherNull, trackingSummarize);
       expect(callCount.n).toBe(0);
       expect(getPost(db, "p1")!.articleSummaryS).toBe("existing S");
       expect(getPost(db, "p1")!.articleSummaryL).toBe("existing L");

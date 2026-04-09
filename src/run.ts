@@ -2,9 +2,8 @@ import { Database } from "bun:sqlite";
 import { initDb } from "./db.ts";
 import type { Post } from "./types.ts";
 import { getPage, getUpvoted, getPostById } from "./hackernews.ts";
-import { getPost, putPosts, hasTitleEmbedding, hasArticleEmbedding, putTitleEmbedding, putArticleEmbedding } from "./post.ts";
+import { getPost, putPosts } from "./post.ts";
 import { fetchSafe } from "./utils.ts";
-import { embed } from "./embedding.ts";
 import { summarize } from "./summarize.ts";
 
 // ── Commands ──────────────────────────────────────────────────────────────────
@@ -81,7 +80,6 @@ export async function cmdPostFetchArticle(
 export async function cmdPostComputeMetadata(
   db: Database,
   postId: string,
-  embedder: typeof embed = embed,
   fetcher: typeof fetchSafe = fetchSafe,
   summarizer: typeof summarize = summarize
 ): Promise<Post> {
@@ -129,18 +127,6 @@ export async function cmdPostComputeMetadata(
     }
   }
 
-  // Title embedding
-  if (!hasTitleEmbedding(db, postId)) {
-    putTitleEmbedding(db, postId, await embedder(post.title));
-    computed.push("titleEmbedding");
-  }
-
-  // Article embedding
-  if (post.article && !hasArticleEmbedding(db, postId)) {
-    putArticleEmbedding(db, postId, await embedder(post.article));
-    computed.push("articleEmbedding");
-  }
-
   if (computed.length === 0) {
     console.log(`post-compute-metadata ${postId}: nothing to compute`);
   } else {
@@ -153,7 +139,6 @@ export async function cmdPostGetComputeMetadata(
   db: Database,
   postId: string,
   hnFetcher: typeof getPostById = getPostById,
-  embedder: typeof embed = embed,
   fetcher: typeof fetchSafe = fetchSafe,
   summarizer: typeof summarize = summarize
 ): Promise<Post> {
@@ -162,7 +147,7 @@ export async function cmdPostGetComputeMetadata(
     putPosts(db, [post]);
     console.log(`post-get-compute-metadata ${postId}: saved post "${post.title}"`);
   }
-  return await cmdPostComputeMetadata(db, postId, embedder, fetcher, summarizer);
+  return await cmdPostComputeMetadata(db, postId, fetcher, summarizer);
 }
 
 export const commands: Record<string, (db: Database, ...args: string[]) => Promise<void>> = {

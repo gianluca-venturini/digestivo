@@ -41,16 +41,6 @@ export function putPosts(db: Database, posts: Post[]): void {
   run();
 }
 
-export function putTitleEmbedding(db: Database, postId: string, embedding: Float32Array): void {
-  db.prepare("DELETE FROM vec_title_embeddings WHERE post_id = ?").run(postId);
-  db.prepare("INSERT INTO vec_title_embeddings (post_id, embedding) VALUES (?, ?)").run(postId, embedding);
-}
-
-export function putArticleEmbedding(db: Database, postId: string, embedding: Float32Array): void {
-  db.prepare("DELETE FROM vec_article_embeddings WHERE post_id = ?").run(postId);
-  db.prepare("INSERT INTO vec_article_embeddings (post_id, embedding) VALUES (?, ?)").run(postId, embedding);
-}
-
 // ── Read ─────────────────────────────────────────────────────────────────────
 
 type PostRow = Omit<Post, "upvoted"> & { upvoted: number };
@@ -70,59 +60,3 @@ export function getPosts(db: Database, ids: string[]): Post[] {
     .map(toPost);
 }
 
-export function hasTitleEmbedding(db: Database, postId: string): boolean {
-  return !!db.query("SELECT 1 FROM vec_title_embeddings WHERE post_id = ?").get(postId);
-}
-
-export function hasArticleEmbedding(db: Database, postId: string): boolean {
-  return !!db.query("SELECT 1 FROM vec_article_embeddings WHERE post_id = ?").get(postId);
-}
-
-// ── Vector search (against upvoted posts only) ────────────────────────────────
-
-export function getPostsTitleSimilar(
-  db: Database,
-  titleEmbedding: Float32Array,
-  k: number
-): { post: Post; distance: number }[] {
-  // Over-fetch since we filter to upvoted only after the KNN query
-  const rows = db
-    .query<{ post_id: string; distance: number }, [Float32Array, number]>(
-      "SELECT post_id, distance FROM vec_title_embeddings WHERE embedding MATCH ? AND k = ?"
-    )
-    .all(titleEmbedding, k * 4);
-
-  if (rows.length === 0) return [];
-
-  const postMap = new Map(
-    getPosts(db, rows.map((r) => r.post_id)).map((p) => [p.id, p])
-  );
-
-  return rows
-    .filter((r) => postMap.get(r.post_id)?.upvoted)
-    .slice(0, k)
-    .map((r) => ({ post: postMap.get(r.post_id)!, distance: r.distance }));
-}
-
-export function getPostsArticleSimilar(
-  db: Database,
-  articleEmbedding: Float32Array,
-  k: number
-): { post: Post; distance: number }[] {
-  const rows = db
-    .query<{ post_id: string; distance: number }, [Float32Array, number]>(
-      "SELECT post_id, distance FROM vec_article_embeddings WHERE embedding MATCH ? AND k = ?"
-    )
-    .all(articleEmbedding, k * 4);
-
-  if (rows.length === 0) return [];
-
-  const postMap = new Map(
-    getPosts(db, rows.map((r) => r.post_id)).map((p) => [p.id, p])
-  );
-
-  return rows
-    .filter((r) => postMap.get(r.post_id)?.upvoted)
-    .slice(0, k)
-    .map((r) => ({ post: postMap.get(r.post_id)!, distance: r.distance }));
-}

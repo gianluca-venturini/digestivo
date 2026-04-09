@@ -3,14 +3,8 @@ import { Database } from "bun:sqlite";
 import { initDb } from "./db.ts";
 import {
   putPosts,
-  putTitleEmbedding,
-  putArticleEmbedding,
   getPost,
   getPosts,
-  hasTitleEmbedding,
-  hasArticleEmbedding,
-  getPostsTitleSimilar,
-  getPostsArticleSimilar,
 } from "./post.ts";
 import type { Post } from "./types.ts";
 
@@ -78,61 +72,5 @@ describe("post", () => {
     });
   });
 
-  describe("putTitleEmbedding / hasTitleEmbedding", () => {
-    it("stores and detects a title embedding", () => {
-      putPosts(db, [makePost()]);
-      expect(hasTitleEmbedding(db, "1")).toBe(false);
-      putTitleEmbedding(db, "1", new Float32Array(384).fill(0.1));
-      expect(hasTitleEmbedding(db, "1")).toBe(true);
-    });
 
-    it("overwrites an existing title embedding", () => {
-      putPosts(db, [makePost()]);
-      putTitleEmbedding(db, "1", new Float32Array(384).fill(0.1));
-      putTitleEmbedding(db, "1", new Float32Array(384).fill(0.9));
-      expect(hasTitleEmbedding(db, "1")).toBe(true);
-    });
-  });
-
-  describe("putArticleEmbedding / hasArticleEmbedding", () => {
-    it("stores and detects an article embedding", () => {
-      putPosts(db, [makePost()]);
-      expect(hasArticleEmbedding(db, "1")).toBe(false);
-      putArticleEmbedding(db, "1", new Float32Array(384).fill(0.5));
-      expect(hasArticleEmbedding(db, "1")).toBe(true);
-    });
-  });
-
-  describe("getPostsTitleSimilar", () => {
-    it("returns only upvoted posts sorted by similarity", () => {
-      putPosts(db, [
-        makePost({ id: "u1", upvoted: true }),
-        makePost({ id: "u2", upvoted: false }),
-      ]);
-      putTitleEmbedding(db, "u1", new Float32Array(384).fill(0.1));
-      putTitleEmbedding(db, "u2", new Float32Array(384).fill(0.9));
-
-      const results = getPostsTitleSimilar(db, new Float32Array(384).fill(0.1), 5);
-      expect(results.every((r) => r.post.upvoted)).toBe(true);
-      expect(results[0]!.post.id).toBe("u1");
-      expect(results[0]!.distance).toBeCloseTo(0, 1);
-    });
-
-    it("returns empty array when no embeddings exist", () => {
-      putPosts(db, [makePost({ upvoted: true })]);
-      expect(getPostsTitleSimilar(db, new Float32Array(384).fill(0.1), 5)).toHaveLength(0);
-    });
-  });
-
-  describe("getPostsArticleSimilar", () => {
-    it("returns upvoted posts sorted by article similarity", () => {
-      putPosts(db, [makePost({ id: "a1", upvoted: true })]);
-      const emb = new Float32Array(384).fill(0.5);
-      putArticleEmbedding(db, "a1", emb);
-
-      const results = getPostsArticleSimilar(db, emb, 5);
-      expect(results).toHaveLength(1);
-      expect(results[0]!.post.id).toBe("a1");
-    });
-  });
 });

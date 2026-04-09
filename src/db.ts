@@ -1,8 +1,6 @@
 import { Database } from "bun:sqlite";
-import * as sqliteVec from "sqlite-vec";
 
 export function initDb(db: Database): void {
-  sqliteVec.load(db);
   db.run("PRAGMA journal_mode = WAL");
   db.run("PRAGMA foreign_keys = ON");
 
@@ -18,20 +16,6 @@ export function initDb(db: Database): void {
       time TEXT NOT NULL,
       domain TEXT,
       upvoted INTEGER NOT NULL DEFAULT 0
-    )
-  `);
-
-  db.run(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS vec_title_embeddings USING vec0(
-      post_id TEXT PRIMARY KEY,
-      embedding float[384] distance_metric=cosine
-    )
-  `);
-
-  db.run(`
-    CREATE VIRTUAL TABLE IF NOT EXISTS vec_article_embeddings USING vec0(
-      post_id TEXT PRIMARY KEY,
-      embedding float[384] distance_metric=cosine
     )
   `);
 
