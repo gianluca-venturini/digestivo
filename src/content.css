@@ -1,0 +1,93 @@
+/* Injected into news.ycombinator.com. Matches HN's Verdana / color tokens. */
+
+.hn-sum-group {
+  white-space: nowrap;
+}
+
+.hn-sum-btn {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 6px;
+  margin: 0 1px;
+  font-family: Verdana, Geneva, sans-serif;
+  font-weight: bold;
+  color: #ff6600;
+  text-align: center;
+  text-decoration: none;
+  border-radius: 3px;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.hn-sum-btn:hover {
+  background: rgba(255, 102, 0, 0.14);
+}
+.hn-sum-btn--loading {
+  opacity: 0.6;
+  cursor: default;
+}
+.hn-sum-btn--disabled,
+.hn-sum-btn--disabled:hover {
+  color: #828282;
+  opacity: 0.7;
+  background: transparent;
+  cursor: default;
+}
+.hn-sum-btn--error,
+.hn-sum-btn--error:hover {
+  color: #c00;
+}
+
+/* Inline summary panel */
+.hn-sum-panel {
+  padding: 6px 10px 9px 0;
+  font-family: Verdana, Geneva, sans-serif;
+  font-size: 9pt;
+  line-height: 1.4;
+  color: #000;
+}
+.hn-sum-body p {
+  margin: 0 0 6px;
+}
+.hn-sum-body ul,
+.hn-sum-body ol {
+  margin: 0 0 6px;
+  padding-left: 20px;
+}
+.hn-sum-body li {
+  margin: 0 0 3px;
+}
+.hn-sum-body code {
+  font-family: Menlo, Consolas, monospace;
+  font-size: 8pt;
+  background: #f0f0e8;
+  padding: 0 2px;
+}
+.hn-sum-loading {
+  color: #828282;
+  font-style: italic;
+}
+.hn-sum-foot {
+  margin-top: 5px;
+  font-size: 8pt;
+  color: #828282;
+}
+.hn-sum-link {
+  color: #828282;
+  cursor: pointer;
+}
+.hn-sum-link:hover {
+  text-decoration: underline;
+}
+
+/* Bigger tap targets on small screens (matches HN's ~750px mobile breakpoint) */
+@media only screen and (max-width: 750px) {
+  .hn-sum-btn {
+    min-width: 40px;
+    padding: 9px 14px;
+    font-size: 12pt;
+  }
+  .hn-sum-panel {
+    font-size: 11pt;
+  }
+}

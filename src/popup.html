@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="popup.css" />
+    <title>HN Summary settings</title>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1><span class="logo">Y</span>HN Summary</h1>
+
+      <label for="jinaKey">Jina Reader API key</label>
+      <input id="jinaKey" type="password" placeholder="jina_..." autocomplete="off" spellcheck="false" />
+      <div class="hint"><a href="https://jina.ai/api-dashboard/" target="_blank" rel="noopener">Get a Jina key →</a></div>
+
+      <label for="openrouterKey">OpenRouter API key</label>
+      <input id="openrouterKey" type="password" placeholder="sk-or-..." autocomplete="off" spellcheck="false" />
+      <div class="hint"><a href="https://openrouter.ai/keys" target="_blank" rel="noopener">Get an OpenRouter key →</a></div>
+
+      <label for="model">Model</label>
+      <input id="model" list="models" placeholder="e.g. openai/gpt-4o-mini" autocomplete="off" spellcheck="false" />
+      <datalist id="models"></datalist>
+      <div class="hint" id="modelHint">Loading model list…</div>
+
+      <div class="row">
+        <button id="save">Save</button>
+        <span id="status" class="status"></span>
+      </div>
+
+      <p class="note">
+        Keys are stored locally in your browser (chrome.storage) and sent only to
+        Jina and OpenRouter. Everything runs client-side.
+      </p>
+    </div>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

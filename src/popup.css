@@ -1,0 +1,88 @@
+body {
+  margin: 0;
+  font-family: Verdana, Geneva, sans-serif;
+  font-size: 12px;
+  color: #000;
+  background: #f6f6ef;
+}
+.wrap {
+  width: 320px;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+}
+h1 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+.logo {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  background: #ff6600;
+  color: #fff;
+  font-weight: bold;
+  border-radius: 2px;
+}
+label {
+  display: block;
+  margin: 12px 0 3px;
+  font-weight: bold;
+}
+input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 7px;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  font-family: inherit;
+  font-size: 12px;
+}
+input:focus {
+  outline: none;
+  border-color: #ff6600;
+}
+.hint {
+  margin-top: 3px;
+  font-size: 11px;
+  color: #828282;
+}
+a {
+  color: #828282;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+#save {
+  background: #ff6600;
+  color: #fff;
+  border: none;
+  padding: 7px 18px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 3px;
+  cursor: pointer;
+}
+#save:hover {
+  background: #e65c00;
+}
+.status {
+  font-size: 12px;
+}
+.status.ok {
+  color: #118a11;
+}
+.note {
+  margin: 14px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #828282;
+}
