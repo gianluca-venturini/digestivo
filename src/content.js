@@ -180,13 +180,18 @@
         writeCache(mode, url, data);
         expand(mode, data);
       } else {
-        // collapse panel, mark the triggering button red, log real error only
+        // collapse panel, mark the triggering button red, surface the error
         openMode = null;
         panelRow.style.display = 'none';
         setLabel('short');
         setLabel('long');
-        console.error('[HN Summary]', (resp && resp.raw) || 'unknown error');
-        showError(mode, (resp && resp.curated) || 'Error');
+        const curated = (resp && resp.curated) || 'Error';
+        const raw = (resp && resp.raw) || 'unknown error';
+        console.error('[HN Summary]', raw);
+        showError(mode, curated);
+        // Also surface the raw error in an alert — visible on mobile where the
+        // console isn't readily accessible (e.g. Orion iOS).
+        alert(`[HN Summary] ${curated}\n\n${raw}`);
       }
     }
 

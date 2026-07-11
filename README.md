@@ -18,7 +18,7 @@ After editing any file, click the **↻ reload** icon on the extension card in `
 
 | Asset | File | Store requirement |
 |-------|------|-------------------|
-| Upload package | `dist/hn-summary-v0.1.0.zip` (run `./build.sh`) | The extension itself, zipped |
+| Upload package | `dist/hn-summary-v0.1.1.zip` (run `./build.sh`) | The extension itself, zipped |
 | Store icon | `icons/128.png` | 128×128 PNG (required) |
 | Small promo tile | `store-assets/promo-small-440x280.png` | 440×280 (optional but recommended) |
 | Marquee promo tile | `store-assets/promo-marquee-1400x560.png` | 1400×560 (optional) |
