@@ -24,6 +24,14 @@ A Chrome (Manifest V3) extension that adds **`+` (short)** and **`++` (long)** s
 
 ## 2. Architecture overview
 
+> **Revision (v0.1.2):** the background service worker was removed. Both Jina and
+> OpenRouter send permissive CORS headers, so the **content script fetches them
+> directly** — no message passing. This is what actually works cross-browser:
+> Orion iOS doesn't run the MV3 service worker, which left the worker path silently
+> unanswered. The sections below still describe the request/response shapes and
+> error handling verbatim; only the *location* of the fetch moved (service worker
+> → content script), and the popup keeps fetching the model list directly.
+
 Because **MV3 content scripts are subject to the host page's CORS policy even with `host_permissions`**, and only the **service worker / extension pages** can make CORS‑exempt cross‑origin requests, all network I/O is centralized in the background service worker. (Both Jina and OpenRouter are in fact CORS‑enabled, but routing through the service worker is the robust, canonical pattern and keeps keys out of the page's isolated world.)
 
 ```
