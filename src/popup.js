@@ -5,7 +5,8 @@ const $ = (id) => document.getElementById(id);
 
 async function init() {
   const s = await getSettings();
-  $('jinaKey').value = s.jinaKey || '';
+  // Versions before 0.2.0 stored a Jina key. Delete it.
+  chrome.storage.local.remove('jinaKey').catch(() => {});
   $('openrouterKey').value = s.openrouterKey || '';
   $('model').value = s.model || '';
   populateModels();
@@ -34,7 +35,6 @@ async function populateModels() {
 
 $('save').addEventListener('click', async () => {
   await setSettings({
-    jinaKey: $('jinaKey').value.trim(),
     openrouterKey: $('openrouterKey').value.trim(),
     model: $('model').value.trim(),
   });

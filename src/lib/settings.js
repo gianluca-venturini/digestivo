@@ -1,6 +1,6 @@
-// Settings persisted in chrome.storage.local. Used by the service worker and popup.
-export const KEYS = ['jinaKey', 'openrouterKey', 'model'];
-export const DEFAULTS = { jinaKey: '', openrouterKey: '', model: '' };
+// Settings persisted in chrome.storage.local. Used by the popup.
+export const KEYS = ['openrouterKey', 'model'];
+export const DEFAULTS = { openrouterKey: '', model: '' };
 
 export async function getSettings() {
   const stored = await chrome.storage.local.get(KEYS);
@@ -12,5 +12,5 @@ export async function setSettings(patch) {
 }
 
 export function isConfigured(s) {
-  return Boolean(s && s.jinaKey && s.openrouterKey && s.model);
+  return Boolean(s && s.openrouterKey && s.model);
 }

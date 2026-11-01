@@ -24,6 +24,11 @@ A Chrome (Manifest V3) extension that adds **`+` (short)** and **`++` (long)** s
 
 ## 2. Architecture overview
 
+> **Revision (v0.2.0):** Jina Reader was removed. A background script fetches
+> the article, and the content script extracts the text locally with Defuddle.
+> See [2026-10-31-drop-jina.md](2026-10-31-drop-jina.md). Sections about Jina below are
+> history only.
+
 > **Revision (v0.1.2):** the background service worker was removed. Both Jina and
 > OpenRouter send permissive CORS headers, so the **content script fetches them
 > directly** — no message passing. This is what actually works cross-browser:
