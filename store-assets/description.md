@@ -80,7 +80,7 @@ WHAT YOU GET
 • Each summary is kept on your computer. When you open it again, it shows immediately.
 
 WHY IT ASKS TO READ ALL SITES
-When you install it, Chrome says that the extension can "read and change all your data on all websites". The extension needs this because a story can link to any website. It uses this permission only when you click (+) or (++). Then it downloads that one page, without your cookies. It does not read or change the pages that you visit. It does not open links to local network addresses.
+When you install it, Chrome says that the extension can "read and change all your data on all websites". The extension needs this because a story can link to any website. It uses this permission only when you click (+) or (++). Then it downloads that one page, without your cookies. It changes only the Hacker News pages, to add the buttons and the summaries. It does not read or change the other pages that you visit. It does not open links to local network addresses.
 
 WHAT YOU NEED
 For the free on-device AI: Chrome 138 or newer on Windows 10 or 11, macOS 13 or newer, Linux, or a Chromebook Plus. You also need 22 GB of free disk space, and a GPU with more than 4 GB of memory (or 16 GB of RAM and 4 CPU cores). It does not work on phones.
@@ -93,11 +93,12 @@ OpenRouter gives you many AI models. The summaries are often better. You pay Ope
 • Then select a model from the list.
 
 PRIVACY
-• With the on-device AI, the article text stays on your computer.
-• With OpenRouter, the article text and your key go only to OpenRouter.
-• No analytics. No tracking. No server. We do not sell data.
+• No analytics or tracking. No server. We do not sell data.
+• With on-device summaries (the default), the article text stays on your computer.
+• OpenRouter is optional. If you select it, the article text and your OpenRouter key go only to OpenRouter.
+• The extension keeps your settings, your OpenRouter key and your past summaries on your computer only.
 • The source code is public: https://github.com/gianluca-venturini/digestivo
-• Privacy policy: <paste the public URL of PRIVACY.md>
+• Privacy policy: https://github.com/gianluca-venturini/digestivo/blob/main/PRIVACY.md
 
 HN Summary is not affiliated with Y Combinator or Hacker News. Gemini is a trademark of Google LLC. Other names are trademarks of their owners.
 ```
@@ -165,7 +166,7 @@ next step.
 |-------|-------|
 | Homepage URL | https://github.com/gianluca-venturini/digestivo |
 | Support URL | https://github.com/gianluca-venturini/digestivo/issues |
-| Privacy policy URL | The public URL of [PRIVACY.md](../PRIVACY.md) |
+| Privacy policy URL | https://github.com/gianluca-venturini/digestivo/blob/main/PRIVACY.md ([PRIVACY.md](../PRIVACY.md)) |
 
 ---
 
