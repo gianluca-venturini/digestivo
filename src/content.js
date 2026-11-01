@@ -8,11 +8,19 @@
   const LABEL = { short: ['(+)', '(-)'], long: ['(++)', '(--)'] };
   const TITLE = { short: 'Short summary', long: 'Long summary' };
   const DISABLED_TITLE = {
-    openrouter: 'Add your OpenRouter API key and pick a model in the extension settings to enable summaries.',
+    openrouter: 'Connect OpenRouter (or paste a key) and pick a model in the extension settings to enable summaries.',
     nano: 'On-device AI is not available here. Choose OpenRouter in the extension settings.',
   };
   const DOWNLOAD_HINT = ' (the first click downloads the on-device model)';
   const NANO_LABEL = 'Gemini Nano (on device)';
+
+  // OpenRouter app attribution (https://openrouter.ai/docs/app-attribution).
+  // HTTP-Referer names the app and is required for the app rankings. Keep this
+  // URL: if it changes, the ranking starts again from zero.
+  const APP_URL = 'https://github.com/gianluca-venturini/digestivo';
+  const APP_NAME = 'HN Summary';
+  const APP_HEADERS = { 'HTTP-Referer': APP_URL, 'X-OpenRouter-Title': APP_NAME, 'X-Title': APP_NAME };
+  const DEFAULT_MODEL = 'openai/gpt-4o-mini'; // same as src/lib/settings.js
 
   let settings = {};
   let configured = false;
@@ -132,7 +140,7 @@
     if (name === 'EmptyContent' && settings.engine === 'nano') return 'On-device AI returned no summary.';
     if (name === 'NetworkError') return 'Network error. Check your connection.';
     if (name === 'EmptyContent') return 'Model returned no summary — try another model';
-    if (code === 401) return 'OpenRouter key rejected — check it in settings';
+    if (code === 401) return 'OpenRouter key rejected — connect again or check the key in settings';
     if (code === 402) return 'Out of OpenRouter credits';
     if (code === 429) return 'Rate limited — try again shortly';
     if (code === 502 || code === 503) return 'Model unavailable — try another model';
@@ -407,10 +415,9 @@
       res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
+          ...APP_HEADERS,
           Authorization: `Bearer ${settings.openrouterKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://news.ycombinator.com/',
-          'X-Title': 'HN Summary',
         },
         body: JSON.stringify({
           model: settings.model,
@@ -708,6 +715,98 @@
     };
   }
 
+  // ---- "Connect OpenRouter": second half of the OAuth PKCE flow ----------
+  // The popup (src/lib/oauth.js) saved `oauthPending` and opened OpenRouter.
+  // OpenRouter sends the user back here with ?code=…&state=…. Anyone can post
+  // an HN link with these parameters, so do nothing unless `state` is ours.
+  const PENDING_MAX_AGE_MS = 15 * 60 * 1000;
+
+  async function finishConnect() {
+    let params;
+    try {
+      params = new URLSearchParams(location.search);
+    } catch {
+      return;
+    }
+    const code = params.get('code');
+    const state = params.get('state');
+    if (!code || !state) return;
+
+    let pending;
+    try {
+      ({ oauthPending: pending } = await chrome.storage.local.get('oauthPending'));
+    } catch {
+      return;
+    }
+    if (!pending || !pending.verifier || pending.state !== state) return;
+
+    // One try only: a reload must not send the code again.
+    await chrome.storage.local.remove('oauthPending');
+    params.delete('code');
+    params.delete('state');
+    const rest = params.toString();
+    history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+
+    if (!(Date.now() - pending.createdAt < PENDING_MAX_AGE_MS)) {
+      showBanner('error', 'The connection took too long. Open the extension and click Connect OpenRouter again.');
+      return;
+    }
+
+    let res;
+    let text = '';
+    try {
+      res = await fetch('https://openrouter.ai/api/v1/auth/keys', {
+        method: 'POST',
+        headers: { ...APP_HEADERS, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, code_verifier: pending.verifier, code_challenge_method: 'S256' }),
+      });
+      text = await res.text();
+    } catch (e) {
+      console.error('[HN Summary] OpenRouter key exchange failed:', String(e));
+      showBanner('error', 'Could not connect OpenRouter (network error). Try again, or paste a key in the extension settings.');
+      return;
+    }
+    let body = null;
+    try { body = JSON.parse(text); } catch { /* non-JSON */ }
+    if (!res.ok || !body || typeof body.key !== 'string' || !body.key) {
+      console.error(`[HN Summary] OpenRouter key exchange: HTTP ${res.status}: ${text.slice(0, 500)}`);
+      showBanner('error', `Could not connect OpenRouter (HTTP ${res.status}). Try again, or paste a key in the extension settings.`);
+      return;
+    }
+
+    const { model } = await chrome.storage.local.get('model');
+    // The user asked for OpenRouter, so use it (the default engine is on-device).
+    const patch = { engine: 'openrouter', openrouterKey: body.key, authMethod: 'oauth', connectedAt: Date.now() };
+    if (!model) patch.model = DEFAULT_MODEL;
+    await chrome.storage.local.set(patch);
+    await loadSettings();
+    controllers.forEach((c) => c.refresh());
+    showBanner('ok', 'OpenRouter connected. Click (+) or (++) next to a story to summarize it.');
+  }
+
+  function showBanner(kind, text) {
+    const old = document.querySelector('.hn-sum-banner');
+    if (old) old.remove();
+    const bar = document.createElement('div');
+    bar.className = `hn-sum-banner hn-sum-banner--${kind}`;
+    bar.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    const msg = document.createElement('span');
+    msg.textContent = `HN Summary: ${text}`;
+    const close = document.createElement('a');
+    close.className = 'hn-sum-banner-close';
+    close.setAttribute('role', 'button');
+    close.setAttribute('aria-label', 'Close');
+    close.textContent = '×';
+    close.addEventListener('click', (e) => {
+      e.preventDefault();
+      bar.remove();
+    });
+    bar.append(msg, close);
+    const main = document.getElementById('hnmain');
+    if (main && main.parentNode) main.parentNode.insertBefore(bar, main);
+    else document.body.prepend(bar);
+  }
+
   // ---- injection ---------------------------------------------------------
   function injectAll() {
     document.querySelectorAll('tr.athing').forEach((row) => {
@@ -725,5 +824,8 @@
     });
   }
 
-  loadSettings().then(injectAll);
+  loadSettings()
+    .then(injectAll)
+    .then(finishConnect)
+    .catch((e) => console.error('[HN Summary]', e));
 })();
