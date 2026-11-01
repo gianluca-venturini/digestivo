@@ -3,6 +3,9 @@
 Paste each field into the corresponding box in the Developer Dashboard.
 Store descriptions are plain text (no Markdown rendering), so paste the text as-is.
 
+For the 0.4.1 privacy update (what to select, why, and the steps), see
+[privacy-update-0.4.1.md](privacy-update-0.4.1.md).
+
 ---
 
 ## Store listing tab

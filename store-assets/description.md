@@ -7,6 +7,7 @@ Copy each text block into the field with the same name in the
 [Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 The store shows plain text only. Do not use Markdown in the fields.
 The text for the **Privacy practices** tab is in [listing.md](listing.md).
+For the 0.4.1 privacy update, see [privacy-update-0.4.1.md](privacy-update-0.4.1.md).
 
 ---
 
