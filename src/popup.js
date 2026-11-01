@@ -1,5 +1,6 @@
 import { getSettings, setSettings, resolveEngine } from './lib/settings.js';
 import { listModels } from './lib/openrouter.js';
+import { startConnect } from './lib/oauth.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -13,6 +14,7 @@ const NANO_BASE = {
 
 const welcome = new URLSearchParams(location.search).has('welcome');
 let modelsLoaded = false;
+let stored = {};
 
 async function init() {
   if (welcome) {
@@ -20,10 +22,12 @@ async function init() {
     $('welcome').hidden = false;
   }
   const s = await getSettings();
+  stored = s;
   // Versions before 0.2.0 stored a Jina key. Delete it.
   chrome.storage.local.remove('jinaKey').catch(() => {});
   $('openrouterKey').value = s.openrouterKey || '';
   $('model').value = s.model || '';
+  showConnection();
   const engine = resolveEngine(s);
   document.querySelector(`input[name="engine"][value="${engine}"]`).checked = true;
   showEngine(engine);
@@ -157,11 +161,82 @@ async function populateModels() {
   }
 }
 
+// A key from "Connect OpenRouter" shows as "Connected". A pasted key shows in
+// the key field, with the Connect button above it.
+function showConnection() {
+  const oauth = stored.authMethod === 'oauth' && Boolean(stored.openrouterKey);
+  $('connected').hidden = !oauth;
+  $('notConnected').hidden = oauth;
+  $('connectedAt').textContent = oauth && stored.connectedAt
+    ? ` (${new Date(stored.connectedAt).toLocaleDateString()})`
+    : '';
+}
+
+$('connect').addEventListener('click', async () => {
+  try {
+    const url = await startConnect();
+    if (chrome.tabs && chrome.tabs.create) {
+      await chrome.tabs.create({ url });
+    } else {
+      window.open(url, '_blank');
+    }
+    // Close the popup. Keep the welcome page (a normal tab) open.
+    if (!welcome) window.close();
+  } catch (e) {
+    console.error('[HN Summary] connect failed', e);
+    $('connectStatus').textContent = `Could not open OpenRouter: ${(e && e.message) || e}. Paste a key below.`;
+  }
+});
+
+$('disconnect').addEventListener('click', async () => {
+  await chrome.storage.local.remove(['openrouterKey', 'authMethod', 'connectedAt']);
+  stored = await getSettings();
+  $('openrouterKey').value = '';
+  showConnection();
+  const status = $('connectStatus');
+  status.textContent = 'Disconnected. To delete the key, go to ';
+  const a = document.createElement('a');
+  a.href = 'https://openrouter.ai/settings/keys';
+  a.target = '_blank';
+  a.rel = 'noopener';
+  a.textContent = 'openrouter.ai/settings/keys';
+  status.append(a, '.');
+});
+
+// The welcome page stays open while the user connects in another tab. Show
+// changes from other tabs, so that Save does not write old values.
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== 'local') return;
+  if (!(changes.engine || changes.openrouterKey || changes.model || changes.authMethod || changes.connectedAt)) return;
+  stored = await getSettings();
+  if (changes.openrouterKey) $('openrouterKey').value = stored.openrouterKey || '';
+  if (changes.model) $('model').value = stored.model || '';
+  showConnection();
+  if (changes.engine) {
+    const engine = resolveEngine(stored);
+    const radio = document.querySelector(`input[name="engine"][value="${engine}"]`);
+    if (!radio.checked) {
+      radio.checked = true;
+      showEngine(engine);
+    }
+  }
+});
+
 $('save').addEventListener('click', async () => {
-  await setSettings({
-    openrouterKey: $('openrouterKey').value.trim(),
-    model: $('model').value.trim(),
-  });
+  const patch = { model: $('model').value.trim() };
+  // When connected, the key field is hidden. Do not write the key then.
+  if (!$('notConnected').hidden) {
+    const key = $('openrouterKey').value.trim();
+    patch.openrouterKey = key;
+    // A key typed by hand replaces a connected key.
+    if (key !== stored.openrouterKey) {
+      patch.authMethod = key ? 'manual' : '';
+      patch.connectedAt = 0;
+    }
+  }
+  await setSettings(patch);
+  stored = await getSettings();
+  showConnection();
   flash($('status'));
 });
 

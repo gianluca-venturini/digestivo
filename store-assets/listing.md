@@ -40,7 +40,7 @@ FEATURES
 • Works on the front page and all list/item pages; text posts (Ask HN, etc.) summarize their discussion.
 • Summaries are cached locally, so re-opening one is instant and doesn't spend tokens again.
 • Summaries on your device by default: free, and the article text does not leave your browser.
-• Optional: pick any model from OpenRouter's catalog in the settings popup.
+• Optional: OpenRouter. Connect it with one click (no key to copy), or paste a key. Pick any model from OpenRouter's catalog in the settings popup.
 • Clear, in-place error messages if a fetch or model call fails.
 • Big enough tap targets to use on mobile.
 
@@ -52,7 +52,7 @@ No other service is used.
 
 WHAT YOU NEED
 • Nothing, in Chrome 138 or newer on Windows, macOS, Linux, or a Chromebook Plus. Chrome downloads its on-device model one time (it needs 22 GB of free disk space, and a GPU with more than 4 GB of memory or 16 GB of RAM).
-• For other browsers and devices, or for better quality: an OpenRouter API key — https://openrouter.ai/keys. Select OpenRouter in the extension's popup, add the key, and pick a model.
+• For other browsers and devices, or for better quality: an OpenRouter account — https://openrouter.ai. Select OpenRouter in the extension's popup and click "Connect OpenRouter". Log in and allow access. The extension gets its own key, named "HN Summary", which you can see or delete at https://openrouter.ai/settings/keys. You can also paste a key from https://openrouter.ai/keys and pick a model.
 
 PRIVACY
 No analytics, no tracking, no data sold. With the on-device engine, the article text does not leave your device. If you select OpenRouter, your key is stored locally on your device and is sent only to OpenRouter, and the article text is sent only to OpenRouter to make the summary. See the privacy policy for details.

@@ -10,8 +10,10 @@ Adds `(+)` (short) and `(++)` (long) buttons to Hacker News that summarize the l
 4. A welcome tab opens. Click **Download now** one time. Chrome downloads its
    on-device model (Gemini Nano). No key is necessary.
    Optional: to use **OpenRouter** (better quality, or a browser without the
-   on-device model), click the toolbar icon, select **OpenRouter**, paste your
-   key, pick a **model**, then **Save**.
+   on-device model), click the toolbar icon, select **OpenRouter**, then click
+   **Connect OpenRouter**. Log in to OpenRouter and allow access. OpenRouter
+   sends you back to Hacker News, and the extension saves its new key.
+   (Or paste an OpenRouter key, pick a **model**, and **Save**.)
 5. Open [news.ycombinator.com](https://news.ycombinator.com/) — `(+)` / `(++)` appear next to each story.
 
 After editing any file, click the **↻ reload** icon on the extension card in `chrome://extensions`, then refresh the HN tab.
@@ -41,13 +43,21 @@ more than 4 GB of memory (or 16 GB of RAM and 4 CPU cores). It does not work on
 Android, iOS (Orion), Firefox, or Safari. There, select OpenRouter.
 See [plans/2026-10-31-on-device-summarizer.md](plans/2026-10-31-on-device-summarizer.md).
 
+**Connect OpenRouter** uses OpenRouter's
+[sign-in and approve steps](https://openrouter.ai/docs/guides/overview/auth/oauth).
+The popup (`src/lib/oauth.js`) opens OpenRouter. The user logs in and allows
+access. OpenRouter sends the user back to
+`https://news.ycombinator.com/?code=…&state=…`. There, the content script
+gives the one-time code to OpenRouter and gets a key. See
+[plans/2026-10-31-openrouter-connect.md](plans/2026-10-31-openrouter-connect.md).
+
 ## Publish to the Chrome Web Store
 
 ### Assets (already generated in this repo)
 
 | Asset | File | Store requirement |
 |-------|------|-------------------|
-| Upload package | `dist/hn-summary-v0.3.0.zip` (run `./build.sh`) | The extension itself, zipped |
+| Upload package | `dist/hn-summary-v0.4.0.zip` (run `./build.sh`) | The extension itself, zipped |
 | Store icon | `icons/128.png` | 128×128 PNG (required) |
 | Small promo tile | `store-assets/promo-small-440x280.png` | 440×280 (optional but recommended) |
 | Marquee promo tile | `store-assets/promo-marquee-1400x560.png` | 1400×560 (optional) |
@@ -70,7 +80,7 @@ settings popup. Screenshots must show the real UI.
 1. **Register as a developer** (one-time): go to the
    [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole),
    sign in, and pay the one-time **$5** registration fee.
-2. **Create item:** click **Add new item** → upload `dist/hn-summary-v0.3.0.zip`.
+2. **Create item:** click **Add new item** → upload `dist/hn-summary-v0.4.0.zip`.
 3. **Store listing:** fill in name, a short + detailed description, category
    (Productivity), language, the **128×128 icon**, your **screenshots**, and the
    **promo tiles** above.

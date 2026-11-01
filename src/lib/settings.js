@@ -1,8 +1,9 @@
 // Settings persisted in chrome.storage.local. Used by the popup.
 // src/content.js is a classic script and cannot import this file. It has a
 // copy of resolveEngine(). Change both together.
-export const KEYS = ['engine', 'openrouterKey', 'model'];
-export const DEFAULTS = { engine: '', openrouterKey: '', model: '' };
+// authMethod: 'oauth' (key from "Connect OpenRouter") or 'manual' (pasted key).
+export const KEYS = ['engine', 'openrouterKey', 'model', 'authMethod', 'connectedAt'];
+export const DEFAULTS = { engine: '', openrouterKey: '', model: '', authMethod: '', connectedAt: 0 };
 
 // `engine` is written only when the user changes the toggle. Until then:
 // users with a saved OpenRouter key and model keep OpenRouter, and everyone

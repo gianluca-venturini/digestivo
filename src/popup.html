@@ -40,9 +40,19 @@
       </div>
 
       <div id="openrouterFields" hidden>
-        <label for="openrouterKey">OpenRouter API key</label>
-        <input id="openrouterKey" type="password" placeholder="sk-or-..." autocomplete="off" spellcheck="false" />
-        <div class="hint"><a href="https://openrouter.ai/keys" target="_blank" rel="noopener">Get an OpenRouter key →</a></div>
+        <div id="connected" class="connected" hidden>
+          <span>✓ Connected to OpenRouter<span id="connectedAt"></span></span>
+          <button id="disconnect" class="link-btn" type="button">Disconnect</button>
+        </div>
+        <div id="notConnected">
+          <button id="connect" class="primary connect" type="button">Connect OpenRouter</button>
+          <div class="hint">Opens OpenRouter. Log in and allow access. No key to copy.</div>
+
+          <label for="openrouterKey" class="sub">or paste an API key</label>
+          <input id="openrouterKey" type="password" placeholder="sk-or-..." autocomplete="off" spellcheck="false" />
+          <div class="hint"><a href="https://openrouter.ai/keys" target="_blank" rel="noopener">Get an OpenRouter key →</a></div>
+        </div>
+        <div id="connectStatus" class="hint"></div>
 
         <label for="model">Model</label>
         <input id="model" list="models" placeholder="e.g. openai/gpt-4o-mini" autocomplete="off" spellcheck="false" />
