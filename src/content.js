@@ -7,17 +7,41 @@
   // [collapsed label, expanded label] per mode
   const LABEL = { short: ['(+)', '(-)'], long: ['(++)', '(--)'] };
   const TITLE = { short: 'Short summary', long: 'Long summary' };
-  const DISABLED_TITLE =
-    'Add your OpenRouter API key and pick a model in the extension settings to enable summaries.';
+  const DISABLED_TITLE = {
+    openrouter: 'Add your OpenRouter API key and pick a model in the extension settings to enable summaries.',
+    nano: 'On-device AI is not available here. Choose OpenRouter in the extension settings.',
+  };
+  const DOWNLOAD_HINT = ' (the first click downloads the on-device model)';
+  const NANO_LABEL = 'Gemini Nano (on device)';
 
   let settings = {};
   let configured = false;
+  let nanoState = ''; // Summarizer.availability(): available | downloadable | downloading | unavailable
   const controllers = []; // one per story, for live enable/disable
 
   // ---- settings ----------------------------------------------------------
+  // Copy of resolveEngine() in src/lib/settings.js (this classic script
+  // cannot import it). Change both together.
+  function resolveEngine(s) {
+    if (s && (s.engine === 'nano' || s.engine === 'openrouter')) return s.engine;
+    return s && s.openrouterKey && s.model ? 'openrouter' : 'nano';
+  }
+
   async function loadSettings() {
-    settings = await chrome.storage.local.get(['openrouterKey', 'model']);
-    configured = Boolean(settings.openrouterKey && settings.model);
+    const stored = await chrome.storage.local.get(['engine', 'openrouterKey', 'model']);
+    settings = { ...stored, engine: resolveEngine(stored) };
+    if (settings.engine === 'nano') {
+      nanoState = await nanoAvailability();
+      configured = nanoState !== 'unavailable';
+    } else {
+      configured = Boolean(settings.openrouterKey && settings.model);
+    }
+  }
+
+  function buttonTitle(mode) {
+    if (!configured) return DISABLED_TITLE[settings.engine] || DISABLED_TITLE.openrouter;
+    if (settings.engine === 'nano' && nanoState !== 'available') return TITLE[mode] + DOWNLOAD_HINT;
+    return TITLE[mode];
   }
 
   // Versions before 0.2.0 stored a Jina key. Delete it.
@@ -29,7 +53,7 @@
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    if (changes.openrouterKey || changes.model) {
+    if (changes.engine || changes.openrouterKey || changes.model) {
       loadSettings().then(() => controllers.forEach((c) => c.refresh()));
     }
   });
@@ -68,7 +92,10 @@
   // 1. The background script fetches the article HTML (a content script
   //    cannot read other sites).
   // 2. This script extracts the text locally with Defuddle.
-  // 3. This script calls OpenRouter directly (it sends CORS headers).
+  // 3. This script summarizes the text with one of two engines:
+  //    - nano: Chrome's built-in Summarizer API (Gemini Nano, on the device).
+  //    - openrouter: OpenRouter, called directly (it sends CORS headers).
+  // See plans/2026-10-31-on-device-summarizer.md.
   const MAX_CHARS = 24000;
   const PROMPTS = {
     short:
@@ -97,6 +124,12 @@
       return code ? `Could not fetch the page (HTTP ${code}).` : 'Could not fetch the page.';
     }
     if (stage === 'extract') return 'No article text found on the page.';
+    if (name === 'NanoUnavailable') return DISABLED_TITLE.nano;
+    if (name === 'NanoNeedsClick') return 'Click the button again to download the on-device model.';
+    if (name === 'NanoCreate') return 'Could not start on-device AI. Try again, or choose OpenRouter in settings.';
+    if (name === 'NanoLanguage') return 'On-device AI does not support this language. Choose OpenRouter in settings.';
+    if (name === 'NanoFailed') return 'On-device AI could not summarize this page.';
+    if (name === 'EmptyContent' && settings.engine === 'nano') return 'On-device AI returned no summary.';
     if (name === 'NetworkError') return 'Network error. Check your connection.';
     if (name === 'EmptyContent') return 'Model returned no summary — try another model';
     if (code === 401) return 'OpenRouter key rejected — check it in settings';
@@ -252,7 +285,122 @@
     return extract(page);
   }
 
-  async function summarizeText(mode, title, content) {
+  // ---- 3a. on-device engine (Chrome Summarizer API) ----------------------
+  const NANO_BASE = {
+    format: 'markdown',
+    expectedInputLanguages: ['en', 'es', 'ja', 'de', 'fr'],
+    outputLanguage: 'en',
+  };
+  const NANO_OPTIONS = {
+    short: { type: 'tldr', length: 'medium' }, // 3 sentences at most
+    long: { type: 'key-points', length: 'long' }, // 7 bullets at most
+  };
+  const NANO_FALLBACK_CHARS = 12000; // when measureInputUsage() is missing
+  const nanoSummarizers = {}; // mode -> Promise<Summarizer>, kept for the page life
+  const nanoProgressListeners = new Set();
+
+  async function nanoAvailability() {
+    if (!('Summarizer' in self)) return 'unavailable';
+    try {
+      return await Summarizer.availability(NANO_BASE);
+    } catch (e) {
+      console.warn('[HN Summary] Summarizer.availability failed', e);
+      return 'unavailable';
+    }
+  }
+
+  // Call this before the first `await` of a click. If the model is not
+  // downloaded, create() needs the click (a user gesture), and Chrome keeps
+  // the gesture valid for a few seconds only. The page fetch can take longer.
+  function getNanoSummarizer(mode) {
+    if (!('Summarizer' in self)) {
+      return Promise.reject({ stage: 'summarize', name: 'NanoUnavailable', raw: 'No Summarizer API in this browser' });
+    }
+    if (!nanoSummarizers[mode]) {
+      nanoSummarizers[mode] = Summarizer.create({
+        ...NANO_BASE,
+        ...NANO_OPTIONS[mode],
+        sharedContext: 'An article linked from Hacker News. The reader is a software engineer.',
+        monitor(m) {
+          m.addEventListener('downloadprogress', (e) => {
+            nanoProgressListeners.forEach((listener) => listener(e.loaded));
+          });
+        },
+      }).then(
+        (summarizer) => {
+          if (nanoState !== 'available') {
+            nanoState = 'available';
+            controllers.forEach((c) => c.refresh()); // remove the download hint
+          }
+          return summarizer;
+        },
+        (e) => {
+          delete nanoSummarizers[mode]; // let the next click try again
+          const name =
+            e && e.name === 'NotAllowedError' ? 'NanoNeedsClick'
+              : e && e.name === 'NotSupportedError' ? 'NanoLanguage'
+                : 'NanoCreate';
+          throw { stage: 'summarize', name, raw: `Summarizer.create: ${(e && e.name) || ''} ${String((e && e.message) || e)}` };
+        },
+      );
+    }
+    return nanoSummarizers[mode];
+  }
+
+  // Nano reads much less text than OpenRouter models. Cut the text until it fits.
+  async function fitToQuota(summarizer, text, context) {
+    const quota = summarizer.inputQuota;
+    if (typeof summarizer.measureInputUsage !== 'function' || !Number.isFinite(quota)) {
+      return text.slice(0, NANO_FALLBACK_CHARS);
+    }
+    let t = text;
+    for (let i = 0; i < 4; i++) {
+      const used = await summarizer.measureInputUsage(t, { context });
+      if (used <= quota) return t;
+      t = t.slice(0, Math.floor(t.length * (quota / used) * 0.9));
+    }
+    return t;
+  }
+
+  async function streamNano(summarizer, text, context, onText) {
+    let out = '';
+    for await (const chunk of summarizer.summarizeStreaming(text, { context })) {
+      out += chunk; // each chunk is new text only
+      onText(out);
+    }
+    return out;
+  }
+
+  async function summarizeWithNano(mode, title, content, summarizerPromise, ui) {
+    const summarizer = await summarizerPromise;
+    ui.onStatus('summarizing…');
+    const context = title ? `Title: ${title}` : undefined;
+    let out = '';
+    try {
+      let text = await fitToQuota(summarizer, content.slice(0, MAX_CHARS), context);
+      try {
+        out = await streamNano(summarizer, text, context, ui.onText);
+      } catch (e) {
+        if (!e || e.name !== 'QuotaExceededError') throw e;
+        text = text.slice(0, Math.floor(text.length / 2));
+        out = await streamNano(summarizer, text, context, ui.onText);
+      }
+    } catch (e) {
+      // The model can be removed or updated while the page is open. Make a
+      // new summarizer on the next click.
+      delete nanoSummarizers[mode];
+      const name = e && e.name === 'NotSupportedError' ? 'NanoLanguage' : 'NanoFailed';
+      throw { stage: 'summarize', name, raw: `Summarizer: ${(e && e.name) || ''} ${String((e && e.message) || e)}` };
+    }
+    out = out.trim();
+    if (!out) {
+      throw { stage: 'summarize', name: 'EmptyContent', raw: 'Summarizer returned no text' };
+    }
+    return out;
+  }
+
+  // ---- 3b. OpenRouter engine ----------------------------------------------
+  async function summarizeWithOpenRouter(mode, title, content) {
     const article = content.length > MAX_CHARS ? content.slice(0, MAX_CHARS) : content;
     let res;
     try {
@@ -307,14 +455,26 @@
     return out;
   }
 
-  async function doSummarize(url, mode, fresh) {
+  // ui: { onStatus(text), onProgress(loaded 0..1), onText(partial summary) }
+  async function doSummarize(url, mode, fresh, ui) {
     if (!configured) {
-      return { ok: false, stage: 'fetch', code: 0, curated: 'Add your OpenRouter key in settings', raw: 'not configured' };
+      return { ok: false, stage: 'summarize', code: 0, curated: buttonTitle(mode), raw: 'not configured' };
+    }
+    const nano = settings.engine === 'nano';
+    let summarizerPromise = null;
+    if (nano) {
+      nanoProgressListeners.add(ui.onProgress);
+      // Start now, while the click is still a valid user gesture. The page
+      // fetch and the model download then also run at the same time.
+      summarizerPromise = getNanoSummarizer(mode);
+      summarizerPromise.catch(() => {}); // the error is read after the fetch
     }
     try {
       const { title, content } = await fetchReadable(url, fresh);
-      const summary = await summarizeText(mode, title, content);
-      return { ok: true, title, summary, model: settings.model };
+      const summary = nano
+        ? await summarizeWithNano(mode, title, content, summarizerPromise, ui)
+        : await summarizeWithOpenRouter(mode, title, content);
+      return { ok: true, title, summary, model: nano ? NANO_LABEL : settings.model };
     } catch (err) {
       const stage = (err && err.stage) || 'summarize';
       const code = (err && err.code) || 0;
@@ -325,6 +485,8 @@
         curated: curateError({ stage, code, name: err && err.name }),
         raw: (err && err.raw) || String(err),
       };
+    } finally {
+      if (nano) nanoProgressListeners.delete(ui.onProgress);
     }
   }
 
@@ -351,16 +513,14 @@
     function applyState(mode) {
       const btn = buttons[mode];
       btn.classList.toggle('hn-sum-btn--disabled', !configured);
-      if (!configured) {
-        btn.title = DISABLED_TITLE;
-      } else if (!btn.classList.contains('hn-sum-btn--error')) {
-        btn.title = TITLE[mode];
+      if (!configured || !btn.classList.contains('hn-sum-btn--error')) {
+        btn.title = buttonTitle(mode);
       }
     }
 
     function clearError(mode) {
       buttons[mode].classList.remove('hn-sum-btn--error');
-      buttons[mode].title = TITLE[mode];
+      buttons[mode].title = buttonTitle(mode);
     }
     function showError(mode, curated) {
       buttons[mode].classList.add('hn-sum-btn--error');
@@ -374,12 +534,32 @@
       setLabel('long');
     }
 
-    function renderLoading() {
+    function renderLoading(text = 'summarizing…') {
       cell.textContent = '';
       const s = document.createElement('span');
       s.className = 'hn-sum-loading';
-      s.textContent = 'summarizing…';
+      s.textContent = text;
       cell.appendChild(s);
+    }
+
+    // Part of a summary while it arrives. No footer until the end.
+    let partialFrame = 0;
+    let partialText = '';
+    function renderPartial(text) {
+      partialText = text;
+      if (partialFrame) return;
+      partialFrame = requestAnimationFrame(() => {
+        partialFrame = 0;
+        cell.textContent = '';
+        const body = document.createElement('div');
+        body.className = 'hn-sum-body';
+        body.innerHTML = hnsumRenderMarkdown(partialText); // safe: escaped in renderer
+        cell.appendChild(body);
+      });
+    }
+    function stopPartial() {
+      if (partialFrame) cancelAnimationFrame(partialFrame);
+      partialFrame = 0;
     }
 
     function renderSummary(mode, data) {
@@ -436,12 +616,30 @@
       renderLoading();
       panelRow.style.display = '';
 
+      let textArrived = false;
+      const ui = {
+        onStatus(text) {
+          if (!textArrived) renderLoading(text);
+        },
+        onProgress(loaded) {
+          if (textArrived || nanoState === 'available') return;
+          renderLoading(
+            loaded < 1 ? `downloading on-device model… ${Math.floor(loaded * 100)}%` : 'loading on-device model…',
+          );
+        },
+        onText(text) {
+          textArrived = true;
+          renderPartial(text);
+        },
+      };
+
       let resp;
       try {
-        resp = await doSummarize(url, mode, fresh);
+        resp = await doSummarize(url, mode, fresh, ui);
       } catch (e) {
         resp = { ok: false, stage: 'summarize', code: 0, curated: 'Error', raw: String(e) };
       }
+      stopPartial();
 
       btn.dataset.loading = '';
       btn.classList.remove('hn-sum-btn--loading');

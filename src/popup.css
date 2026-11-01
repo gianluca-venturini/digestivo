@@ -60,7 +60,7 @@ a {
   gap: 10px;
   margin-top: 16px;
 }
-#save {
+button.primary {
   background: #ff6600;
   color: #fff;
   border: none;
@@ -71,7 +71,7 @@ a {
   border-radius: 3px;
   cursor: pointer;
 }
-#save:hover {
+button.primary:hover {
   background: #e65c00;
 }
 .status {
@@ -85,4 +85,66 @@ a {
   font-size: 10px;
   line-height: 1.5;
   color: #828282;
+}
+button.primary:disabled {
+  background: #ccc;
+  cursor: default;
+}
+.welcome {
+  margin: 0 0 4px;
+  line-height: 1.5;
+}
+.welcome p {
+  margin: 0 0 8px;
+}
+.welcome a {
+  color: #ff6600;
+}
+fieldset.engine {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+fieldset.engine legend {
+  padding: 0;
+  margin: 0 0 4px;
+  font-weight: bold;
+}
+label.choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0;
+  font-weight: normal;
+  cursor: pointer;
+}
+label.choice input {
+  width: auto;
+  margin: 0;
+  accent-color: #ff6600;
+}
+.tag {
+  font-size: 10px;
+  color: #828282;
+}
+.nano-status {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+.nano-status.ok {
+  color: #118a11;
+}
+.nano-status.bad {
+  color: #c00;
+}
+progress {
+  flex: 1;
+  accent-color: #ff6600;
+}
+body.tab .wrap {
+  width: 480px;
+  margin: 24px auto;
+}
+[hidden] {
+  display: none !important;
 }

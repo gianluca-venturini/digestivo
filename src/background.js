@@ -12,6 +12,17 @@ const MAX_BYTES = 3 * 1024 * 1024; // read at most 3 MB of a page
 const TIMEOUT_MS = 20000;
 const ACCEPT = 'text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8,*/*;q=0.1';
 
+// On a new install, open the welcome page. Its button starts the download of
+// the on-device model (the download needs a user click). Then the model is
+// often ready before the first visit to Hacker News.
+// If onInstalled does not fire (Orion), the first (+) click starts the download.
+if (chrome.runtime.onInstalled) {
+  chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason !== 'install') return;
+    chrome.tabs.create({ url: chrome.runtime.getURL('src/popup.html?welcome=1') });
+  });
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (!msg || msg.type !== 'hnsum:fetch') return;
   if (sender.id !== chrome.runtime.id || !sender.tab) return;
