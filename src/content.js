@@ -8,7 +8,7 @@
   const LABEL = { short: ['(+)', '(-)'], long: ['(++)', '(--)'] };
   const TITLE = { short: 'Short summary', long: 'Long summary' };
   const DISABLED_TITLE =
-    'Add your Jina and OpenRouter API keys and pick a model in the extension settings to enable summaries.';
+    'Add your OpenRouter API key and pick a model in the extension settings to enable summaries.';
 
   let settings = {};
   let configured = false;
@@ -16,13 +16,20 @@
 
   // ---- settings ----------------------------------------------------------
   async function loadSettings() {
-    settings = await chrome.storage.local.get(['jinaKey', 'openrouterKey', 'model']);
-    configured = Boolean(settings.jinaKey && settings.openrouterKey && settings.model);
+    settings = await chrome.storage.local.get(['openrouterKey', 'model']);
+    configured = Boolean(settings.openrouterKey && settings.model);
+  }
+
+  // Versions before 0.2.0 stored a Jina key. Delete it.
+  try {
+    Promise.resolve(chrome.storage.local.remove('jinaKey')).catch(() => {});
+  } catch {
+    /* ignore */
   }
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    if (changes.jinaKey || changes.openrouterKey || changes.model) {
+    if (changes.openrouterKey || changes.model) {
       loadSettings().then(() => controllers.forEach((c) => c.refresh()));
     }
   });
@@ -57,10 +64,11 @@
     return row.id ? `https://news.ycombinator.com/item?id=${row.id}` : null;
   }
 
-  // ---- summarization (runs in the content script) ------------------------
-  // Both Jina and OpenRouter are CORS-enabled, so we fetch directly here.
-  // (A background service worker isn't reliable across browsers — notably
-  // Orion iOS doesn't run the MV3 worker — so we don't depend on one.)
+  // ---- summarization ------------------------------------------------------
+  // 1. The background script fetches the article HTML (a content script
+  //    cannot read other sites).
+  // 2. This script extracts the text locally with Defuddle.
+  // 3. This script calls OpenRouter directly (it sends CORS headers).
   const MAX_CHARS = 24000;
   const PROMPTS = {
     short:
@@ -74,12 +82,22 @@
   const MAX_TOKENS = { short: 1000, long: 2000 };
 
   function curateError({ stage, code, name } = {}) {
-    if (name === 'NetworkError' || code === 0) return 'Network error — check your connection';
     if (stage === 'fetch') {
-      if (code === 401) return 'Jina key rejected — check it in settings';
-      if (code === 429) return 'Jina rate limit — try again shortly';
-      return "Couldn't fetch the page";
+      if (name === 'NoBackground') {
+        return 'Extension background is not running. Open the extension popup one time, then try again.';
+      }
+      if (name === 'Timeout') return 'The page took too long to load.';
+      if (name === 'Network') return 'Network error. Check your connection.';
+      if (name === 'Blocked') return 'Links to local network addresses are not supported.';
+      if (name === 'BadUrl') return 'This link cannot be summarized.';
+      if (name === 'NotHtml') return 'This link is not a web page (for example, a PDF).';
+      if (code === 401 || code === 403) return 'The site blocked the request.';
+      if (code === 404 || code === 410) return 'Page not found.';
+      if (code === 429) return 'The site limits requests. Try again later.';
+      return code ? `Could not fetch the page (HTTP ${code}).` : 'Could not fetch the page.';
     }
+    if (stage === 'extract') return 'No article text found on the page.';
+    if (name === 'NetworkError') return 'Network error. Check your connection.';
     if (name === 'EmptyContent') return 'Model returned no summary — try another model';
     if (code === 401) return 'OpenRouter key rejected — check it in settings';
     if (code === 402) return 'Out of OpenRouter credits';
@@ -88,35 +106,150 @@
     return 'API error';
   }
 
-  async function fetchReadable(url, fresh) {
-    const headers = {
-      Accept: 'application/json',
-      'X-Return-Format': 'markdown',
-      'X-Retain-Images': 'none',
-      'X-Timeout': '20',
-    };
-    if (settings.jinaKey) headers.Authorization = `Bearer ${settings.jinaKey}`;
-    if (fresh) headers['X-No-Cache'] = 'true';
+  // ---- 1. fetch through the background -----------------------------------
+  const REPLY_WAIT_MS = 25000; // background gives up after 20 s
+  const pendingTabReplies = new Map(); // reqId -> resolve (reply method B)
 
-    let res;
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (!msg || msg.type !== 'hnsum:fetch-result') return;
+    const resolve = pendingTabReplies.get(msg.reqId);
+    if (resolve) resolve(msg.result);
+  });
+
+  const NO_BACKGROUND = { ok: false, name: 'NoBackground', status: 0 };
+
+  function withTimeout(promise, ms) {
+    let timer;
+    const late = new Promise((resolve) => {
+      timer = setTimeout(() => resolve({ ...NO_BACKGROUND, raw: `No reply from the background after ${ms / 1000} s` }), ms);
+    });
+    return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+  }
+
+  // Method A: the normal reply of sendMessage.
+  function askWithReply(url, fresh) {
+    let sent;
     try {
-      res = await fetch('https://r.jina.ai/' + url, { method: 'GET', headers });
+      sent = Promise.resolve(chrome.runtime.sendMessage({ type: 'hnsum:fetch', url, fresh }));
     } catch (e) {
-      throw { stage: 'fetch', code: 0, name: 'NetworkError', raw: String(e) };
+      sent = Promise.reject(e);
     }
-    const text = await res.text();
-    let body = null;
-    try { body = JSON.parse(text); } catch { /* non-JSON error page */ }
-    if (!res.ok || !body || body.code >= 400 || !body.data) {
-      const code = (body && body.code) || res.status;
-      throw {
-        stage: 'fetch',
-        code,
-        name: body && body.name,
-        raw: `Jina ${code}: ${(body && body.message) || text.slice(0, 500)}`,
-      };
+    return withTimeout(
+      sent.then(
+        (reply) => reply || { ...NO_BACKGROUND, empty: true, raw: 'The background sent an empty reply' },
+        (e) => ({ ...NO_BACKGROUND, empty: true, raw: String(e) }),
+      ),
+      REPLY_WAIT_MS,
+    );
+  }
+
+  // Method B: the background sends the result as a new message to this tab.
+  function askWithTabMessage(url, fresh) {
+    const reqId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const arrived = new Promise((resolve) => pendingTabReplies.set(reqId, resolve));
+    try {
+      Promise.resolve(chrome.runtime.sendMessage({ type: 'hnsum:fetch', url, fresh, reply: 'tab', reqId })).catch(() => {});
+    } catch {
+      /* the timeout reports it */
     }
-    return { title: body.data.title || '', content: body.data.content || '' };
+    return withTimeout(arrived, REPLY_WAIT_MS).finally(() => pendingTabReplies.delete(reqId));
+  }
+
+  async function fetchPage(url, fresh) {
+    let page = await askWithReply(url, fresh);
+    // An empty reply means the reply channel failed, not the fetch. Ask again
+    // with method B. A timeout is not retried (the user already waited 25 s).
+    if (!page.ok && page.empty) {
+      console.warn('[HN Summary] normal reply failed, trying tab message:', page.raw);
+      page = await askWithTabMessage(url, fresh);
+    }
+    if (!page.ok) {
+      throw { stage: 'fetch', code: page.status || 0, name: page.name, raw: page.raw || page.name };
+    }
+    return page;
+  }
+
+  // ---- 2. extract the text locally ---------------------------------------
+  // Defuddle must stay local (no network). Three locks make sure of this:
+  //  - only parse() is called. Its network code is only in parseAsync().
+  //  - the `fetch` option makes every extractor request fail.
+  //  - DOMParser documents are inert: no scripts run, no images or frames load.
+  // scripts/verify-vendor.sh checks the vendored file and these calls.
+  const MIN_WORDS = 20;
+
+  function blockedFetch(input) {
+    console.error('[HN Summary] Defuddle tried to use the network. Blocked:', String(input && input.url ? input.url : input));
+    return Promise.reject(new Error('Network is blocked during text extraction'));
+  }
+
+  const BLOCK_TAGS = new Set([
+    'ADDRESS', 'ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'BR', 'DD', 'DIV', 'DL', 'DT', 'FIGCAPTION', 'FIGURE',
+    'FOOTER', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HEADER', 'HR', 'LI', 'MAIN', 'NAV', 'OL', 'P', 'PRE',
+    'SECTION', 'TABLE', 'TR', 'UL',
+  ]);
+  const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'IFRAME', 'OBJECT']);
+
+  // Parse with DOMParser (inert). Never put the HTML into the live HN page:
+  // that would load its images and frames.
+  function htmlToText(html) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const out = [];
+    const walk = (node) => {
+      for (const child of node.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          out.push(child.nodeValue.replace(/\s+/g, ' '));
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+          const tag = child.tagName.toUpperCase();
+          if (SKIP_TAGS.has(tag)) continue;
+          const block = BLOCK_TAGS.has(tag);
+          if (block) out.push('\n');
+          if (tag === 'LI') out.push('- ');
+          if (/^H[1-6]$/.test(tag)) out.push('#'.repeat(Number(tag[1])) + ' ');
+          walk(child);
+          if (block) out.push('\n');
+          if (tag === 'TD' || tag === 'TH') out.push(' ');
+        }
+      }
+    };
+    if (doc.body) walk(doc.body);
+    return out
+      .join('')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n[ \t]+/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function extract(page) {
+    if (/text\/plain/i.test(page.contentType || '')) {
+      return { title: '', content: page.html.trim() };
+    }
+    let title = '';
+    let content = '';
+    try {
+      const doc = new DOMParser().parseFromString(page.html, 'text/html');
+      title = doc.title || '';
+      const result = new Defuddle(doc, {
+        url: page.finalUrl, // else Defuddle sees the HN page URL and uses its HN extractor
+        useAsync: false,
+        removeImages: true,
+        fetch: blockedFetch,
+      }).parse();
+      title = result.title || title;
+      content = htmlToText(result.content || '');
+    } catch (e) {
+      throw { stage: 'extract', code: 0, name: 'NoContent', raw: `Defuddle failed on ${page.finalUrl}: ${String(e)}` };
+    }
+    const words = content.split(/\s+/).filter(Boolean).length;
+    if (words < MIN_WORDS) {
+      throw { stage: 'extract', code: 0, name: 'NoContent', raw: `Only ${words} words found on ${page.finalUrl}` };
+    }
+    return { title, content };
+  }
+
+  async function fetchReadable(url, fresh) {
+    const page = await fetchPage(url, fresh);
+    return extract(page);
   }
 
   async function summarizeText(mode, title, content) {
@@ -176,7 +309,7 @@
 
   async function doSummarize(url, mode, fresh) {
     if (!configured) {
-      return { ok: false, stage: 'fetch', code: 0, curated: 'Add your API keys in settings', raw: 'not configured' };
+      return { ok: false, stage: 'fetch', code: 0, curated: 'Add your OpenRouter key in settings', raw: 'not configured' };
     }
     try {
       const { title, content } = await fetchReadable(url, fresh);

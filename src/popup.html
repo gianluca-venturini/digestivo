@@ -10,9 +10,6 @@
     <div class="wrap">
       <h1><span class="logo">Y</span>HN Summary</h1>
 
-      <label for="jinaKey">Jina Reader API key</label>
-      <input id="jinaKey" type="password" placeholder="jina_..." autocomplete="off" spellcheck="false" />
-      <div class="hint"><a href="https://jina.ai/api-dashboard/" target="_blank" rel="noopener">Get a Jina key →</a></div>
 
       <label for="openrouterKey">OpenRouter API key</label>
       <input id="openrouterKey" type="password" placeholder="sk-or-..." autocomplete="off" spellcheck="false" />
@@ -29,8 +26,9 @@
       </div>
 
       <p class="note">
-        Keys are stored locally in your browser (chrome.storage) and sent only to
-        Jina and OpenRouter. Everything runs client-side.
+        Your OpenRouter key is stored only in this browser (chrome.storage) and
+        is sent only to OpenRouter. The extension fetches articles directly from
+        your browser, without cookies. There is no server.
       </p>
     </div>
     <script type="module" src="popup.js"></script>
