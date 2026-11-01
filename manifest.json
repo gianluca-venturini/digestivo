@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "HN Summary",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "minimum_chrome_version": "121",
-  "description": "Add + / ++ buttons to Hacker News that summarize the linked article with OpenRouter.",
+  "description": "Add + / ++ buttons to Hacker News that summarize the linked article on your device, or with OpenRouter.",
   "action": {
     "default_popup": "src/popup.html",
     "default_icon": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" }

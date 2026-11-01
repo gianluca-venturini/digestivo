@@ -24,6 +24,11 @@ A Chrome (Manifest V3) extension that adds **`+` (short)** and **`++` (long)** s
 
 ## 2. Architecture overview
 
+> **Revision (v0.3.0):** OpenRouter is now optional. The default engine is
+> Chrome's built-in Summarizer API (Gemini Nano, on the device), so the
+> extension works with no key. See
+> [2026-10-31-on-device-summarizer.md](2026-10-31-on-device-summarizer.md).
+
 > **Revision (v0.2.0):** Jina Reader was removed. A background script fetches
 > the article, and the content script extracts the text locally with Defuddle.
 > See [2026-10-31-drop-jina.md](2026-10-31-drop-jina.md). Sections about Jina below are
