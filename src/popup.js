@@ -203,13 +203,36 @@ $('disconnect').addEventListener('click', async () => {
   status.append(a, '.');
 });
 
+// The welcome page stays open while the user connects in another tab. Show
+// changes from other tabs, so that Save does not write old values.
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== 'local') return;
+  if (!(changes.engine || changes.openrouterKey || changes.model || changes.authMethod || changes.connectedAt)) return;
+  stored = await getSettings();
+  if (changes.openrouterKey) $('openrouterKey').value = stored.openrouterKey || '';
+  if (changes.model) $('model').value = stored.model || '';
+  showConnection();
+  if (changes.engine) {
+    const engine = resolveEngine(stored);
+    const radio = document.querySelector(`input[name="engine"][value="${engine}"]`);
+    if (!radio.checked) {
+      radio.checked = true;
+      showEngine(engine);
+    }
+  }
+});
+
 $('save').addEventListener('click', async () => {
-  const key = $('openrouterKey').value.trim();
-  const patch = { openrouterKey: key, model: $('model').value.trim() };
-  // A key typed by hand replaces a connected key.
-  if (key !== stored.openrouterKey) {
-    patch.authMethod = key ? 'manual' : '';
-    patch.connectedAt = 0;
+  const patch = { model: $('model').value.trim() };
+  // When connected, the key field is hidden. Do not write the key then.
+  if (!$('notConnected').hidden) {
+    const key = $('openrouterKey').value.trim();
+    patch.openrouterKey = key;
+    // A key typed by hand replaces a connected key.
+    if (key !== stored.openrouterKey) {
+      patch.authMethod = key ? 'manual' : '';
+      patch.connectedAt = 0;
+    }
   }
   await setSettings(patch);
   stored = await getSettings();

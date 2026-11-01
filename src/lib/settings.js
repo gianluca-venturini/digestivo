@@ -5,10 +5,6 @@
 export const KEYS = ['engine', 'openrouterKey', 'model', 'authMethod', 'connectedAt'];
 export const DEFAULTS = { engine: '', openrouterKey: '', model: '', authMethod: '', connectedAt: 0 };
 
-// Set when the user connects OpenRouter and no model is set yet, so one click
-// is enough. src/content.js has a copy. Change both together.
-export const DEFAULT_MODEL = 'openai/gpt-4o-mini';
-
 // `engine` is written only when the user changes the toggle. Until then:
 // users with a saved OpenRouter key and model keep OpenRouter, and everyone
 // else gets the on-device model.

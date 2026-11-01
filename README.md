@@ -44,10 +44,11 @@ Android, iOS (Orion), Firefox, or Safari. There, select OpenRouter.
 See [plans/2026-10-31-on-device-summarizer.md](plans/2026-10-31-on-device-summarizer.md).
 
 **Connect OpenRouter** uses OpenRouter's
-[OAuth PKCE flow](https://openrouter.ai/docs/guides/overview/auth/oauth). The
-popup (`src/lib/oauth.js`) opens OpenRouter. OpenRouter sends the user back to
-`https://news.ycombinator.com/?code=…&state=…`, where the content script
-exchanges the code for a key. See
+[sign-in and approve steps](https://openrouter.ai/docs/guides/overview/auth/oauth).
+The popup (`src/lib/oauth.js`) opens OpenRouter. The user logs in and allows
+access. OpenRouter sends the user back to
+`https://news.ycombinator.com/?code=…&state=…`. There, the content script
+gives the one-time code to OpenRouter and gets a key. See
 [plans/2026-10-31-openrouter-connect.md](plans/2026-10-31-openrouter-connect.md).
 
 ## Publish to the Chrome Web Store

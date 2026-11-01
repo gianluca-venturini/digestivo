@@ -144,7 +144,8 @@ again from zero. Select the URL one time.
 ### 4.2 `src/lib/settings.js`
 
 - `KEYS`: add `authMethod`, `connectedAt`.
-- Add `DEFAULT_MODEL = 'openai/gpt-4o-mini'`.
+- The default model `openai/gpt-4o-mini` is only in `content.js`, because
+  only `finishConnect()` uses it.
 
 ### 4.3 `src/lib/oauth.js` (new, ES module, used by the popup)
 
@@ -196,22 +197,29 @@ When `authMethod === 'oauth'` and there is a key:
    Use it in `summarizeText`.
 2. `finishConnect()`, called one time at start, before `injectAll`:
    - Read `code` and `state` from `location.search`. If one is missing, return.
-   - Read `oauthPending`. If it is missing, or `state` is not equal, return.
-     Do not change the URL. (The link is not from our flow.)
+   - Read `oauthPending`. If it is missing, return. Do not change the URL.
+     (The link is not from our flow.)
+   - If `state` is not equal, the user clicked Connect again after this tab
+     opened. Remove `code` and `state` from the URL. Keep `oauthPending` for
+     the newest tab. Show the error bar "This OpenRouter tab is old. Use the
+     newest OpenRouter tab, or open the extension and click Connect
+     OpenRouter again."
    - Remove `code` and `state` from the URL with `history.replaceState`.
-   - Remove `oauthPending`.
+   - Remove `oauthPending`. (A code works one time only, so a second try with
+     the same code cannot work.)
    - If it is more than 15 minutes old: show the error bar "The connection
      took too long. Open the extension and click Connect OpenRouter again."
    - `POST /api/v1/auth/keys` with `APP_HEADERS` and `Content-Type`.
    - If OK and `key` is a string: write `engine: 'openrouter'`, `openrouterKey`, `authMethod: 'oauth'`,
-     `connectedAt`, and `model` (only if no model is set). Call
-     `loadSettings()` and refresh the buttons. Show the bar "OpenRouter
-     connected. Click (+) or (++) next to a story to summarize it."
-   - Else: show the error bar "Could not connect OpenRouter (HTTP n). Try
-     again, or paste a key in the extension settings." Write the raw error
-     to `console.error`.
+     `connectedAt`, and `model` (only if no model is set). The
+     `storage.onChanged` listener loads the settings and enables the
+     buttons. Show the bar "OpenRouter connected. Click (+) or (++) next to
+     a story to summarize it."
+   - Else: show the error bar "Could not connect OpenRouter (HTTP n). Open
+     the extension and click Connect OpenRouter again, or paste a key." Write
+     the raw error to `console.error`.
 3. The bar: one `div.hn-sum-banner` at the top of `#hnmain` (or `body`), with
-   an `×` button to close it. Green-grey for OK, red text for errors. HN fonts
+   an `×` `<button>` to close it (the keyboard can reach it). Green-grey for OK, red text for errors. HN fonts
    and colors.
 4. `DISABLED_TITLE.openrouter`: "Connect OpenRouter (or paste a key) and pick a model in
    the extension settings to enable summaries."
@@ -296,8 +304,19 @@ challenge).
 
 ### Desktop results (Playwright Chromium 1.64.1, 2026-10-31)
 
-- 17 of 17 checks in 6.1 passed, on the source folder and on the unzipped
-  `dist/hn-summary-v0.4.0.zip`.
+- After the rebase on `main` (on-device engine) and the code review fixes:
+  21 of 21 checks in 6.1 passed, on the source folder and on the unzipped
+  `dist/hn-summary-v0.4.0.zip`. The on-device test from `main` passed: 29 of
+  29.
+- Code review fixes, each with a test that fails on the old code:
+  - The welcome page stays open during Connect. It now shows changes from
+    other tabs. Save does not write the key when the key field is hidden.
+    Before, Save on that page deleted the new key.
+  - An old OpenRouter tab (the user clicked Connect two times) now shows a
+    red bar. Before, nothing happened.
+  - The bar's `×` is a `<button>`. Before, the keyboard could not reach it.
+  - Error bars say "click Connect OpenRouter again", because the code works
+    one time only.
 - The 0.2.0 summary test (12 real links, mock OpenRouter) passed again: 12 of
   12, 0 unexpected requests.
 - Problem found and fixed: the "Connected" date in the popup used UTC (it

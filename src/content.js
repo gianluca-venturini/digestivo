@@ -20,7 +20,8 @@
   const APP_URL = 'https://github.com/gianluca-venturini/digestivo';
   const APP_NAME = 'HN Summary';
   const APP_HEADERS = { 'HTTP-Referer': APP_URL, 'X-OpenRouter-Title': APP_NAME, 'X-Title': APP_NAME };
-  const DEFAULT_MODEL = 'openai/gpt-4o-mini'; // same as src/lib/settings.js
+  // Set when the user connects OpenRouter and no model is set yet, so one click is enough.
+  const DEFAULT_MODEL = 'openai/gpt-4o-mini';
 
   let settings = {};
   let configured = false;
@@ -738,14 +739,26 @@
     } catch {
       return;
     }
-    if (!pending || !pending.verifier || pending.state !== state) return;
+    if (!pending || !pending.verifier) return;
+
+    const cleanUrl = () => {
+      params.delete('code');
+      params.delete('state');
+      const rest = params.toString();
+      history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+    };
+
+    if (pending.state !== state) {
+      // The user clicked Connect again after this tab opened. Only the newest
+      // OpenRouter tab can finish. Keep the pending state for that tab.
+      cleanUrl();
+      showBanner('error', 'This OpenRouter tab is old. Use the newest OpenRouter tab, or open the extension and click Connect OpenRouter again.');
+      return;
+    }
 
     // One try only: a reload must not send the code again.
     await chrome.storage.local.remove('oauthPending');
-    params.delete('code');
-    params.delete('state');
-    const rest = params.toString();
-    history.replaceState(history.state, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+    cleanUrl();
 
     if (!(Date.now() - pending.createdAt < PENDING_MAX_AGE_MS)) {
       showBanner('error', 'The connection took too long. Open the extension and click Connect OpenRouter again.');
@@ -763,14 +776,14 @@
       text = await res.text();
     } catch (e) {
       console.error('[HN Summary] OpenRouter key exchange failed:', String(e));
-      showBanner('error', 'Could not connect OpenRouter (network error). Try again, or paste a key in the extension settings.');
+      showBanner('error', 'Could not connect OpenRouter (network error). Open the extension and click Connect OpenRouter again, or paste a key.');
       return;
     }
     let body = null;
     try { body = JSON.parse(text); } catch { /* non-JSON */ }
     if (!res.ok || !body || typeof body.key !== 'string' || !body.key) {
       console.error(`[HN Summary] OpenRouter key exchange: HTTP ${res.status}: ${text.slice(0, 500)}`);
-      showBanner('error', `Could not connect OpenRouter (HTTP ${res.status}). Try again, or paste a key in the extension settings.`);
+      showBanner('error', `Could not connect OpenRouter (HTTP ${res.status}). Open the extension and click Connect OpenRouter again, or paste a key.`);
       return;
     }
 
@@ -778,9 +791,8 @@
     // The user asked for OpenRouter, so use it (the default engine is on-device).
     const patch = { engine: 'openrouter', openrouterKey: body.key, authMethod: 'oauth', connectedAt: Date.now() };
     if (!model) patch.model = DEFAULT_MODEL;
+    // The storage.onChanged listener above loads the settings and enables the buttons.
     await chrome.storage.local.set(patch);
-    await loadSettings();
-    controllers.forEach((c) => c.refresh());
     showBanner('ok', 'OpenRouter connected. Click (+) or (++) next to a story to summarize it.');
   }
 
@@ -792,15 +804,12 @@
     bar.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     const msg = document.createElement('span');
     msg.textContent = `HN Summary: ${text}`;
-    const close = document.createElement('a');
+    const close = document.createElement('button');
+    close.type = 'button';
     close.className = 'hn-sum-banner-close';
-    close.setAttribute('role', 'button');
     close.setAttribute('aria-label', 'Close');
     close.textContent = '×';
-    close.addEventListener('click', (e) => {
-      e.preventDefault();
-      bar.remove();
-    });
+    close.addEventListener('click', () => bar.remove());
     bar.append(msg, close);
     const main = document.getElementById('hnmain');
     if (main && main.parentNode) main.parentNode.insertBefore(bar, main);
