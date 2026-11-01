@@ -177,7 +177,7 @@ next step.
    This change is in the product, not in the listing.
 2. **Store icon padding.** Make the 128×128 icon with 96×96 artwork and 16 px
    of transparent space on each side, as Google asks.
-3. **Publish 0.4.0 soon.** The live listing is version 0.1.4. It still says
+3. **Publish 0.4.1 soon.** The live listing is version 0.1.4. It still says
    that you need Jina and OpenRouter keys. The new text and images are not
    correct for that version.
 4. **Ask for a "Featured" badge** after the release. Google wants the main

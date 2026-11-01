@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "HN Summary",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "minimum_chrome_version": "121",
   "description": "See what a Hacker News link says before you click. Short or long summaries, free and private on your computer.",
   "action": {

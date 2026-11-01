@@ -57,7 +57,7 @@ gives the one-time code to OpenRouter and gets a key. See
 
 | Asset | File | Store requirement |
 |-------|------|-------------------|
-| Upload package | `dist/hn-summary-v0.4.0.zip` (run `./build.sh`) | The extension itself, zipped |
+| Upload package | `dist/hn-summary-v0.4.1.zip` (run `./build.sh`) | The extension itself, zipped |
 | Store icon | `icons/128.png` | 128×128 PNG (required) |
 | Small promo tile | `store-assets/promo-small-440x280.png` | 440×280 (optional but recommended) |
 | Marquee promo tile | `store-assets/promo-marquee-1400x560.png` | 1400×560 (optional) |
@@ -81,7 +81,7 @@ The screenshots and promo tiles are made from the real extension by
 1. **Register as a developer** (one-time): go to the
    [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole),
    sign in, and pay the one-time **$5** registration fee.
-2. **Create item:** click **Add new item** → upload `dist/hn-summary-v0.4.0.zip`.
+2. **Create item:** click **Add new item** → upload `dist/hn-summary-v0.4.1.zip`.
 3. **Store listing:** copy the name, description, category and language from
    `store-assets/description.md`, and upload the **128×128 icon**, the five
    **screenshots** in order, and the **promo tiles** above.
