@@ -1,62 +1,14 @@
-# Chrome Web Store listing — copy/paste
+# Chrome Web Store listing — privacy fields
 
 Paste each field into the corresponding box in the Developer Dashboard.
 Store descriptions are plain text (no Markdown rendering), so paste the text as-is.
 
 ---
 
-## Item name
-`HN Summary`
+## Store listing tab
 
-## Category
-`Productivity`
-
-## Language
-`English (United States)`
-
----
-
-## Short description
-_(max 132 characters)_
-
-```
-Add (+) and (++) buttons to Hacker News that summarize any linked article on your device. No key, no server.
-```
-
----
-
-## Detailed description
-_(max 16,000 characters — plain text)_
-
-```
-HN Summary adds two small buttons — (+) for a short TL;DR and (++) for a longer bulleted summary — next to every story on Hacker News. Click one and read the gist of the linked article without leaving the front page.
-
-It runs entirely in your browser. There is no server, no account, and no key to add: by default, summaries are made on your device by Chrome's built-in AI (Gemini Nano). For better quality, you can select OpenRouter and use your own key.
-
-FEATURES
-• (+) short summary and (++) long summary buttons on every story.
-• Summaries render inline, right under the story, styled to match Hacker News.
-• Click (-) / (--) to collapse a summary again.
-• Works on the front page and all list/item pages; text posts (Ask HN, etc.) summarize their discussion.
-• Summaries are cached locally, so re-opening one is instant and doesn't spend tokens again.
-• Summaries on your device by default: free, and the article text does not leave your browser.
-• Optional: OpenRouter. Connect it with one click (no key to copy), or paste a key. Pick any model from OpenRouter's catalog in the settings popup.
-• Clear, in-place error messages if a fetch or model call fails.
-• Big enough tap targets to use on mobile.
-
-HOW IT WORKS
-1. Your browser downloads the linked page directly, without cookies.
-2. The extension finds the article text locally, in your browser.
-3. Chrome's built-in model summarizes that text on your device. Or, if you select OpenRouter, the OpenRouter model you chose summarizes it, using your key.
-No other service is used.
-
-WHAT YOU NEED
-• Nothing, in Chrome 138 or newer on Windows, macOS, Linux, or a Chromebook Plus. Chrome downloads its on-device model one time (it needs 22 GB of free disk space, and a GPU with more than 4 GB of memory or 16 GB of RAM).
-• For other browsers and devices, or for better quality: an OpenRouter account — https://openrouter.ai. Select OpenRouter in the extension's popup and click "Connect OpenRouter". Log in and allow access. The extension gets its own key, named "HN Summary", which you can see or delete at https://openrouter.ai/settings/keys. You can also paste a key from https://openrouter.ai/keys and pick a model.
-
-PRIVACY
-No analytics, no tracking, no data sold. With the on-device engine, the article text does not leave your device. If you select OpenRouter, your key is stored locally on your device and is sent only to OpenRouter, and the article text is sent only to OpenRouter to make the summary. See the privacy policy for details.
-```
+The name, summary, description, category, screenshots and promo tiles are in
+[description.md](description.md).
 
 ---
 

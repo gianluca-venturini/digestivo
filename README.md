@@ -57,10 +57,12 @@ gives the one-time code to OpenRouter and gets a key. See
 
 | Asset | File | Store requirement |
 |-------|------|-------------------|
-| Upload package | `dist/hn-summary-v0.4.0.zip` (run `./build.sh`) | The extension itself, zipped |
+| Upload package | `dist/hn-summary-v0.4.1.zip` (run `./build.sh`) | The extension itself, zipped |
 | Store icon | `icons/128.png` | 128×128 PNG (required) |
 | Small promo tile | `store-assets/promo-small-440x280.png` | 440×280 (optional but recommended) |
 | Marquee promo tile | `store-assets/promo-marquee-1400x560.png` | 1400×560 (optional) |
+| Screenshots | `store-assets/screenshot-1-…png` to `screenshot-5-…png` | 1280×800, 1 to 5 |
+| Listing text | [`store-assets/description.md`](store-assets/description.md) | Name, summary, description, category |
 | Privacy policy | `PRIVACY.md` | Required — host it and paste the URL (see step 5) |
 
 Build (or rebuild) the upload package with the included script — it reads the
@@ -70,20 +72,19 @@ version from `manifest.json` and writes `dist/hn-summary-v<version>.zip`:
 ./build.sh
 ```
 
-**You still need to capture screenshots yourself** (at least 1, up to 5, at
-**1280×800** or 640×400 PNG). Load the extension (see above), then screenshot
-Hacker News with the `(+)`/`(++)` buttons and an expanded summary, and the
-settings popup. Screenshots must show the real UI.
+The screenshots and promo tiles are made from the real extension by
+`store-assets/source/make.sh`. Run it again after a change to the UI. See
+[`store-assets/description.md`](store-assets/description.md), section 6.
 
 ### Steps
 
 1. **Register as a developer** (one-time): go to the
    [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole),
    sign in, and pay the one-time **$5** registration fee.
-2. **Create item:** click **Add new item** → upload `dist/hn-summary-v0.4.0.zip`.
-3. **Store listing:** fill in name, a short + detailed description, category
-   (Productivity), language, the **128×128 icon**, your **screenshots**, and the
-   **promo tiles** above.
+2. **Create item:** click **Add new item** → upload `dist/hn-summary-v0.4.1.zip`.
+3. **Store listing:** copy the name, description, category and language from
+   `store-assets/description.md`, and upload the **128×128 icon**, the five
+   **screenshots** in order, and the **promo tiles** above.
 4. **Privacy practices:** state the single purpose ("summarize the linked
    article for a Hacker News story"), and justify each item:
    - `storage` — save the selected engine, the user's OpenRouter key and model, and cached summaries locally.
