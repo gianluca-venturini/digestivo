@@ -3,7 +3,7 @@
   "name": "HN Summary",
   "version": "0.4.0",
   "minimum_chrome_version": "121",
-  "description": "Add + / ++ buttons to Hacker News that summarize the linked article on your device, or with OpenRouter.",
+  "description": "See what a Hacker News link says before you click. Short or long summaries, free and private on your computer.",
   "action": {
     "default_popup": "src/popup.html",
     "default_icon": { "16": "icons/16.png", "48": "icons/48.png", "128": "icons/128.png" }

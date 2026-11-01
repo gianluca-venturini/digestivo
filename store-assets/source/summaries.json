@@ -1,0 +1,14 @@
+{
+  "https://terrytao.wordpress.com/2026/11/01/mathematics-has-changed-lets-act-like-it/": {
+    "mode": "short",
+    "title": "Mathematics has changed. Let’s act like it",
+    "summary": "In a guest post, Frank Calegari says mathematicians should not be sad about OpenAI’s release of more than 700 AI-written research papers. He compares the moment to the classification of finite simple groups: the field must check and rewrite the results, reward people who return to old problems, and use the new tools to ask deeper questions.",
+    "model": "Gemini Nano (on device)"
+  },
+  "https://www.jefftk.com/p/bidirectional-charging-during-grid-outages": {
+    "mode": "long",
+    "title": "Bidirectional Charging During Grid Outages",
+    "summary": "The author wants an electric car that powers the house in a blackout and also recharges from solar panels, but finds almost no product that does both today.\n\n- GM’s V2H bundle powers the home during an outage, but does not say the car can recharge while the grid is down.\n- Ford’s Charge Station Pro, which automatic home backup needs, is no longer for sale.\n- Wallbox’s Quasar 2 for Kia has reported problems, and cannot use solar charging and V2H at the same time.\n- Tesla Powershare with a Cybertruck is the only setup found that recharges from solar during an outage.\n- Enphase targets volume production of a bidirectional charger in Q4 2026, but the author expects a delay.\n- For now, the author plans a smaller battery only for emergencies.",
+    "model": "anthropic/claude-sonnet-5.5"
+  }
+}

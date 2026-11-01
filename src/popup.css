@@ -18,14 +18,8 @@ h1 {
   font-size: 14px;
 }
 .logo {
-  display: inline-block;
   width: 18px;
   height: 18px;
-  line-height: 18px;
-  text-align: center;
-  background: #ff6600;
-  color: #fff;
-  font-weight: bold;
   border-radius: 2px;
 }
 label {
