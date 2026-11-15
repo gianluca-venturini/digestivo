@@ -31,6 +31,7 @@ async function init() {
   const engine = resolveEngine(s);
   document.querySelector(`input[name="engine"][value="${engine}"]`).checked = true;
   showEngine(engine);
+  showAccess();
 }
 
 function showEngine(engine) {
@@ -63,7 +64,7 @@ async function nanoAvailability() {
   try {
     return await Summarizer.availability(NANO_BASE);
   } catch (e) {
-    console.warn('[HN Summary] Summarizer.availability failed', e);
+    console.warn('[Hacker News Summary] Summarizer.availability failed', e);
     return 'unavailable';
   }
 }
@@ -77,6 +78,7 @@ function setNanoStatus(text, kind) {
 async function showNanoStatus() {
   const state = await nanoAvailability();
   const row = $('nanoDownloadRow');
+  $('cloudNotice').hidden = true;
   if (state === 'available') {
     row.hidden = true;
     setNanoStatus('Ready on this device.', 'ok');
@@ -95,12 +97,14 @@ async function showNanoStatus() {
     row.hidden = true;
     setNanoStatus(
       'Not available in this browser or on this device. It needs Chrome 138 or newer on Windows, macOS, ' +
-        'Linux, or a Chromebook Plus, 22 GB of free disk space, and a GPU with more than 4 GB of memory ' +
-        '(or 16 GB of RAM). Select OpenRouter to get summaries.',
+        'Linux, or a Chromebook Plus, and a GPU with more than 4 GB of memory (or 16 GB of RAM). ' +
+        'Chrome needs 22 GB of free disk space before it starts the download. The model itself is about 4 GB.',
       'bad',
     );
+    $('cloudNotice').hidden = false;
     if (welcome) {
-      $('welcomeNext').textContent = 'This browser cannot make summaries on the device. Select OpenRouter below and add a key.';
+      $('welcomeNext').textContent =
+        'This browser cannot make summaries on the device. You can use OpenRouter instead. The article text is then sent to OpenRouter.';
     }
   }
 }
@@ -132,11 +136,51 @@ $('nanoDownload').addEventListener('click', async () => {
     btn.disabled = false;
     showNanoStatus();
   } catch (e) {
-    console.error('[HN Summary] Summarizer.create failed', e);
+    console.error('[Hacker News Summary] Summarizer.create failed', e);
     bar.hidden = true;
     btn.disabled = false;
     setNanoStatus(`The download failed: ${(e && e.message) || e}`, 'bad');
   }
+});
+
+$('switchToOpenrouter').addEventListener('click', async () => {
+  const radio = document.querySelector('input[name="engine"][value="openrouter"]');
+  radio.checked = true;
+  await setSettings({ engine: 'openrouter' });
+  showEngine('openrouter');
+  flash($('engineSaved'));
+});
+
+// ---- access to linked websites ---------------------------------------------
+// The extension can use only HN and OpenRouter at install. To download a page
+// that a story links to, it needs access to all websites. Chrome allows the
+// request only from an extension page, after a click.
+const SITE_ORIGINS = ['http://*/*', 'https://*/*'];
+
+async function showAccess() {
+  let granted = false;
+  try {
+    granted = await chrome.permissions.contains({ origins: SITE_ORIGINS });
+  } catch {
+    // This browser has no optional permissions: it keeps the access it has.
+    $('access').hidden = true;
+    return;
+  }
+  $('accessRow').hidden = granted;
+  $('accessHint').hidden = granted;
+  $('accessStatus').textContent = granted
+    ? 'Access to linked websites is allowed. Pages download only when you click (+) or (++).'
+    : 'Access to linked websites is not allowed yet. Summaries of outside links cannot work.';
+  $('accessStatus').className = `nano-status${granted ? ' ok' : ' bad'}`;
+}
+
+$('accessAllow').addEventListener('click', async () => {
+  try {
+    await chrome.permissions.request({ origins: SITE_ORIGINS });
+  } catch (e) {
+    console.error('[Hacker News Summary] permission request failed', e);
+  }
+  showAccess();
 });
 
 // ---- OpenRouter --------------------------------------------------------------
@@ -156,7 +200,7 @@ async function populateModels() {
       });
     $('modelHint').textContent = `${models.length} models — type to search, or paste any slug`;
   } catch (e) {
-    console.error('[HN Summary] model list failed', e);
+    console.error('[Hacker News Summary] model list failed', e);
     $('modelHint').textContent = 'Could not load model list — type a slug manually';
   }
 }
@@ -183,7 +227,7 @@ $('connect').addEventListener('click', async () => {
     // Close the popup. Keep the welcome page (a normal tab) open.
     if (!welcome) window.close();
   } catch (e) {
-    console.error('[HN Summary] connect failed', e);
+    console.error('[Hacker News Summary] connect failed', e);
     $('connectStatus').textContent = `Could not open OpenRouter: ${(e && e.message) || e}. Paste a key below.`;
   }
 });

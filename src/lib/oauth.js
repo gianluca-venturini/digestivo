@@ -3,12 +3,13 @@
 //
 // The popup makes a secret (verifier) and saves it, then opens OpenRouter.
 // OpenRouter sends the user back to news.ycombinator.com with ?code=…&state=….
-// The content script there (src/content.js, finishConnect) checks `state`,
-// sends the code and the verifier to OpenRouter, and saves the new key.
+// The content script there (src/content.js, finishConnect) passes the code
+// to the background (src/background.js, finishConnect). The background checks
+// `state`, sends the code and the verifier to OpenRouter, and saves the new key.
 const OPENROUTER_AUTH = 'https://openrouter.ai/auth';
 // The content script already runs on every HN page, on all browsers.
 export const CALLBACK_URL = 'https://news.ycombinator.com/';
-export const KEY_LABEL = 'HN Summary';
+export const KEY_LABEL = 'Hacker News Summary';
 
 function base64url(bytes) {
   let bin = '';
