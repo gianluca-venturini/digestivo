@@ -35,8 +35,8 @@ _(max 1,000 characters — one field covering every match pattern in "permission
 
 ```
 The content script runs only on https://news.ycombinator.com/*. It adds the (+) and (++) buttons and shows summaries under the stories. It also completes "Connect OpenRouter", because OpenRouter returns the user to that page.
-At install, the extension has host access only to https://news.ycombinator.com/* and https://openrouter.ai/*. http://*/* and https://*/* are optional host permissions. The extension asks for them one time, from its welcome page or popup, after a click, because a story can link to any website. When the user clicks (+) or (++), the background script downloads only that one linked page, without cookies, so that the extension can read the article text. A content script cannot read other websites. No page is downloaded until the user clicks a button. Local network addresses are refused, also after redirects (declarativeNetRequest block rules). The permission declarativeNetRequest is used only for these block rules.
-https://openrouter.ai/* is used only if the user selects OpenRouter: to get the public model list, to get the key during "Connect OpenRouter", and to make summaries. By default, Chrome's built-in Summarizer API makes the summary on the device, and the article text is not sent to a server.
+At install, host access is only news.ycombinator.com and openrouter.ai. http://*/* and https://*/* are optional: the extension asks once, after a click, because a story can link to any website. When the user clicks (+) or (++), the background script downloads only that one linked page, without cookies. No page is downloaded before a click. Local network addresses are refused, also after redirects (declarativeNetRequest block rules, used only for this).
+openrouter.ai is used only if the user selects OpenRouter: model list, key for "Connect OpenRouter", summaries. By default, Chrome's built-in Summarizer API makes the summary on the device.
 ```
 
 ## Are you using remote code?
