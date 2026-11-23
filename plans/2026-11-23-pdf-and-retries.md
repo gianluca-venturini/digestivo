@@ -59,9 +59,13 @@ script only gets new error names and waits longer.
   36,000 characters. 15 s to read the text.
 - The background returns the text as `contentType: 'text/plain'` with the PDF
   title. The content script uses it like a plain text page.
-- pdf.js runs on the background thread, so a timer cannot stop it. On the
-  15 s limit, `task.destroy()` stops the work, and `pdfText()` checks the time
-  between pages (it keeps the pages read so far).
+- pdf.js runs on the background thread as one chain of promises, so a timer
+  does not fire before it ends (tested). `pdfText()` checks the clock between
+  pages instead: after 15 s it stops and keeps the pages read so far, or fails
+  if no page was read. `task.destroy()` frees the document at the end.
+- pdf.js is always loaded (about 40 ms at each service worker start). Loading
+  it only for PDFs is possible in Chrome (import at `install`, then
+  `importScripts` later), but was not worth the extra code.
 - Text pieces get a space between them when the next piece starts on a new
   line or after a gap (`itemsToText()`), so words at column joins do not merge.
 - New errors: `PdfTooLarge`, `PdfNoText` (scanned PDF), `PdfLocked`, `PdfFailed`.
@@ -98,5 +102,5 @@ and read two times.
 | Point | State |
 |---|---|
 | Orion iOS | Test a PDF link. 0.4.1 showed "background is not running" after 25 s on a PDF. |
-| Service worker start | pdf.js adds about 1.5 MB to parse at each start. Measure in Chrome. |
+| Service worker start | pdf.js takes about 40 ms to load at each start in Chromium here. Accepted. |
 | Store privacy form | PDF text is website content, like page text. No new data type. |

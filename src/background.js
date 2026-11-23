@@ -12,16 +12,10 @@
 'use strict';
 
 // pdf.js (src/vendor, see src/vendor/README.md) reads the text of PDF links.
-// Chrome runs this file as a service worker: load pdf.js here. Orion, Firefox
-// and Safari load the two files from the manifest "scripts" list instead.
+// Chrome runs this file as a service worker and loads pdf.js here. Orion,
+// Firefox and Safari load it from the manifest "scripts" list (no importScripts).
 // The worker file sets globalThis.pdfjsWorker, so pdf.js runs here, without a Worker.
-if (typeof importScripts === 'function' && typeof pdfjsLib === 'undefined') {
-  try {
-    importScripts('vendor/pdf.min.js', 'vendor/pdf.worker.min.js');
-  } catch (e) {
-    console.warn('[Hacker News Summary] pdf.js did not load', e);
-  }
-}
+if (typeof importScripts === 'function') importScripts('vendor/pdf.min.js', 'vendor/pdf.worker.min.js');
 
 const MAX_BYTES = 3 * 1024 * 1024; // read at most 3 MB of a page
 const MAX_PDF_BYTES = 20 * 1024 * 1024; // a PDF must be complete to be read
@@ -359,17 +353,13 @@ async function fetchPage(url, fresh) {
 }
 
 // How long to wait before the one retry, or null for no retry.
+// 429: only with a Retry-After of 5 s or less. 502/503/504: the same, or 1 s
+// when the header is missing.
 function retryDelayMs(result) {
-  if (result.ok) return null;
+  if (result.status !== 429 && !RETRY_STATUSES.includes(result.status)) return null;
   const after = result.retryAfter ?? null; // seconds, or null when the header is missing
-  if (result.status === 429) {
-    return after !== null && after <= MAX_RETRY_AFTER_S ? Math.max(after * 1000, 250) : null;
-  }
-  if (RETRY_STATUSES.includes(result.status)) {
-    if (after === null) return RETRY_BACKOFF_MS;
-    return after <= MAX_RETRY_AFTER_S ? Math.max(after * 1000, 250) : null;
-  }
-  return null;
+  if (after === null) return result.status === 429 ? null : RETRY_BACKOFF_MS;
+  return after <= MAX_RETRY_AFTER_S ? Math.max(after * 1000, 250) : null;
 }
 
 // Retry-After is a number of seconds or an HTTP date. Returns seconds or null.
@@ -434,7 +424,6 @@ async function fetchOnce(target, fresh, deadline) {
     const contentType = res.headers.get('content-type') || '';
     if (isPdf(contentType, finalUrl)) {
       const { bytes, truncated } = await readCapped(res, MAX_PDF_BYTES + 1);
-      clearTimeout(timer); // the download is done. Reading the text has its own limit.
       if (truncated || bytes.length > MAX_PDF_BYTES) {
         return fail('PdfTooLarge', res.status, `PDF larger than ${MAX_PDF_BYTES / 1024 / 1024} MB: ${finalUrl}`);
       }
@@ -473,47 +462,38 @@ function cancelBody(res) {
 //  - no URL for CMaps or standard fonts, so pdf.js has nothing to download.
 // scripts/verify-vendor.sh checks these options.
 async function readPdf(bytes, finalUrl) {
-  if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 1024)).indexOf('%PDF-') === -1) {
+  if (!new TextDecoder('latin1').decode(bytes.subarray(0, 1024)).includes('%PDF-')) {
     return fail('PdfFailed', 0, `The server did not send a PDF file (no %PDF- header): ${finalUrl}`);
   }
-  if (typeof pdfjsLib === 'undefined') return fail('PdfFailed', 0, 'pdf.js is not loaded');
-  let timer;
-  const late = new Promise((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`PDF text took more than ${PDF_TIMEOUT_MS / 1000} s`)), PDF_TIMEOUT_MS);
+  const task = pdfjsLib.getDocument({
+    data: bytes,
+    isEvalSupported: false,
+    disableFontFace: true,
+    useSystemFonts: false,
+    useWorkerFetch: false,
+    isOffscreenCanvasSupported: false,
+    disableAutoFetch: true,
+    disableStream: true,
+    disableRange: true,
+    verbosity: 0,
   });
-  // pdf.js runs on this thread. The timer cannot stop work that runs, so
-  // task.destroy() in `finally` stops the rest, and pdfText() checks the time
-  // between pages.
+  // pdf.js runs on this thread as one chain of promises: a timer would not
+  // fire before the end. pdfText() checks the clock between pages instead.
   const stopAt = Date.now() + PDF_TIMEOUT_MS;
-  let task = null;
-  let doc = null;
   try {
-    task = pdfjsLib.getDocument({
-      data: bytes,
-      isEvalSupported: false,
-      disableFontFace: true,
-      useSystemFonts: false,
-      useWorkerFetch: false,
-      isOffscreenCanvasSupported: false,
-      disableAutoFetch: true,
-      disableStream: true,
-      disableRange: true,
-      verbosity: 0,
-    });
-    doc = await Promise.race([task.promise, late]);
-    const { title, text, pages } = await Promise.race([pdfText(doc, stopAt), late]);
+    const doc = await task.promise;
+    const { title, text, pages } = await pdfText(doc, stopAt);
     const words = text.split(/\s+/).filter(Boolean).length;
     if (words < 20) {
       return fail('PdfNoText', 0, `Only ${words} words in the PDF (${pages} pages read): ${finalUrl}`);
     }
     // contentType text/plain: the content script uses the text as it is.
-    return { ok: true, finalUrl, contentType: 'text/plain', html: text, title, truncated: pages < doc.numPages, kind: 'pdf' };
+    return { ok: true, finalUrl, contentType: 'text/plain', html: text, title, truncated: pages < doc.numPages };
   } catch (e) {
     const name = e && e.name === 'PasswordException' ? 'PdfLocked' : 'PdfFailed';
     return fail(name, 0, `pdf.js: ${(e && e.name) || ''} ${String((e && e.message) || e)} (${finalUrl})`);
   } finally {
-    clearTimeout(timer);
-    if (task) task.destroy().catch(() => {}); // also destroys doc
+    task.destroy().catch(() => {}); // also frees the document
   }
 }
 
@@ -532,14 +512,14 @@ async function pdfText(doc, stopAt) {
   // Read a bit more than MAX_CHARS: the summary uses only the start.
   for (let i = 1; i <= last && size < MAX_CHARS * 1.5; i++) {
     if (Date.now() > stopAt) {
-      if (!parts.length) throw new Error(`PDF text took more than ${PDF_TIMEOUT_MS / 1000} s`);
+      if (!parts.length) throw new Error(`Reading the PDF took more than ${PDF_TIMEOUT_MS / 1000} s`);
       break; // keep the pages read so far
     }
     const page = await doc.getPage(i);
-    const content = await page.getTextContent();
+    const text = itemsToText((await page.getTextContent()).items);
     page.cleanup();
-    parts.push(itemsToText(content.items));
-    size += parts[parts.length - 1].length;
+    parts.push(text);
+    size += text.length;
     pages = i;
   }
   const text = parts
