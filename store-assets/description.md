@@ -1,4 +1,4 @@
-# HN Summary — Chrome Web Store listing
+# Hacker News Summary — Chrome Web Store listing
 
 This file has the text and images for each part of the store listing:
 https://chromewebstore.google.com/detail/hn-summary/mhidflapanlggcfmgfmlkbojpimodhif
@@ -16,7 +16,7 @@ For the 0.4.1 privacy update, see [privacy-update-0.4.1.md](privacy-update-0.4.1
 We compared three possible hooks with a second agent:
 "free and private on-device AI", "decide what to read", and "use any model".
 
-- **Main promise:** know what a link says before you click it.
+- **Main promise:** read a summary of a link without leaving HN.
   People find the listing when they search for "hacker news". They want a
   better Hacker News, not "on-device AI".
 - **Proof of the promise:** free, private, no key, no account, no server.
@@ -42,7 +42,7 @@ free and private (3), see the path for other computers (4, 5).
 ### Item name
 
 ```
-HN Summary
+Hacker News Summary
 ```
 
 ### Summary (132 characters maximum)
@@ -51,10 +51,10 @@ The store takes this text from `"description"` in `manifest.json`.
 It shows in search results and on the listing card.
 
 ```
-See what a Hacker News link says before you click. Short or long summaries, free and private on your computer.
+Summaries of Hacker News links, without leaving HN. On-device if your browser can, or OpenRouter (article text goes to OpenRouter).
 ```
 
-(110 characters. Also used as `"description"` in `manifest.json`.)
+(131 characters. Also used as `"description"` in `manifest.json`.)
 
 ### Description
 
@@ -62,15 +62,16 @@ The first two lines show before "more". They must give the promise and the
 proof.
 
 ```
-See what a Hacker News link says before you open it. HN Summary adds (+) and (++) next to each story. Click one, and a summary opens under the story.
+Read a summary of a Hacker News link without leaving HN. Hacker News Summary adds (+) and (++) next to each story. Click one, and a summary opens under the story.
 
-Summaries are free and private on most new computers with Chrome. You do not need an account, a key, or a server.
+If your computer can run Chrome's on-device AI, summaries are free and the article text stays on your computer. If it cannot, you can use OpenRouter. Then the article text is sent to OpenRouter. You choose; nothing switches by itself.
 
 HOW TO USE
-1. Install HN Summary. A welcome page opens.
-2. Click "Download now" one time. Chrome gets its on-device AI model.
-   Or, if your computer cannot run it: select OpenRouter and click "Connect OpenRouter". Log in and allow access.
-3. Open Hacker News and click (+) or (++) next to a story.
+1. Install Hacker News Summary. A welcome page opens.
+2. Click "Allow access to linked websites" one time.
+3. Click "Download now" one time. Chrome gets its on-device AI model.
+   Or, if your computer cannot run it: select OpenRouter and click "Connect OpenRouter". Log in and allow access. The article text is then sent to OpenRouter.
+4. Open Hacker News and click (+) or (++) next to a story.
 
 WHAT YOU GET
 • (+) gives a short summary of 2 or 3 sentences.
@@ -78,18 +79,18 @@ WHAT YOU GET
 • The summary opens under the story. You stay on the page.
 • Click (-) or (--) to close the summary.
 • For "Ask HN" and other text posts, you get a summary of the discussion.
-• Each summary is kept on your computer. When you open it again, it shows immediately.
+• Each summary is kept in the extension's storage on your computer. When you open it again, it shows immediately.
 
-WHY IT ASKS TO READ ALL SITES
-When you install it, Chrome says that the extension can "read and change all your data on all websites". The extension needs this because a story can link to any website. It uses this permission only when you click (+) or (++). Then it downloads that one page, without your cookies. It changes only the Hacker News pages, to add the buttons and the summaries. It does not read or change the other pages that you visit. It does not open links to local network addresses.
+WEBSITE ACCESS
+At install, the extension can use only news.ycombinator.com and openrouter.ai. You can check this in Chrome's permission list. A story can link to any website, so the extension asks you one time, on its welcome page, for access to linked websites. It uses this access only when you click (+) or (++). Then it downloads that one page, without your cookies. Your computer sends the request, so the website sees a visit from your IP address, as when you open the link. The extension changes only the Hacker News pages, to add the buttons and the summaries. It does not read or change the other pages that you visit. It refuses links to local network addresses, also after a redirect. One known limit: a public name that points to a local address is not detected.
 
 WHAT YOU NEED
-For the free on-device AI: Chrome 138 or newer on Windows 10 or 11, macOS 13 or newer, Linux, or a Chromebook Plus. You also need 22 GB of free disk space, and a GPU with more than 4 GB of memory (or 16 GB of RAM and 4 CPU cores). It does not work on phones.
-If your computer cannot do this, use OpenRouter.
+For the free on-device AI: Chrome 138 or newer on Windows 10 or 11, macOS 13 or newer, Linux, or a Chromebook Plus. You also need a GPU with more than 4 GB of memory (or 16 GB of RAM and 4 CPU cores). Chrome needs 22 GB of free disk space before it starts the download. The model itself is about 4 GB. It does not work on phones.
+If your computer cannot do this, you can use OpenRouter. The article text is then sent to OpenRouter.
 
 OPENROUTER (OPTIONAL)
 OpenRouter gives you many AI models. The summaries are often better. You pay OpenRouter for what you use.
-• Click "Connect OpenRouter", log in, and allow access. You do not copy a key. The extension gets its own key, named "HN Summary". You can see or delete it at https://openrouter.ai/settings/keys
+• Click "Connect OpenRouter", log in, and allow access. You do not copy a key. The extension gets its own key, named "Hacker News Summary". You can see or delete it at https://openrouter.ai/settings/keys
 • Or paste a key from https://openrouter.ai/keys
 • Then select a model from the list.
 
@@ -101,7 +102,7 @@ PRIVACY
 • The source code is public: https://github.com/gianluca-venturini/digestivo
 • Privacy policy: https://github.com/gianluca-venturini/digestivo/blob/main/PRIVACY.md
 
-HN Summary is not affiliated with Y Combinator or Hacker News. Gemini is a trademark of Google LLC. Other names are trademarks of their owners.
+Hacker News Summary is not affiliated with Y Combinator or Hacker News. Gemini is a trademark of Google LLC. Other names are trademarks of their owners.
 ```
 
 ### Category
@@ -135,7 +136,7 @@ at that size. The images are PNG without an alpha channel, with square corners.
 
 | # | File | Headline | Sub-caption | What it shows |
 |---|------|----------|-------------|---------------|
-| 1 | [screenshot-1-summary-on-hn.png](screenshot-1-summary-on-hn.png) | Know what a link says before you click | Click (+) next to any story. The summary opens under it. | Hacker News with (+) and (++) on each story, and a short summary open under one story ("via Gemini Nano (on device)"). |
+| 1 | [screenshot-1-summary-on-hn.png](screenshot-1-summary-on-hn.png) | Summaries without leaving HN | Click (+) next to any story. The summary opens under it. | Hacker News with (+) and (++) on each story, and a short summary open under one story ("via Gemini Nano (on device)"). |
 | 2 | [screenshot-2-long-summary.png](screenshot-2-long-summary.png) | Short or long. Your choice. | Click (++) for a longer summary in bullet points. | A (++) summary: one line of overview, then a list ("via anthropic/claude-sonnet-5.5"). |
 | 3 | [screenshot-3-on-device.png](screenshot-3-on-device.png) | Free. Private. On your computer. | Chrome's built-in AI. No key. The text stays on your device. | Popup: On-device (Gemini Nano) selected, "Ready on this device." |
 | 4 | [screenshot-4-connect-openrouter.png](screenshot-4-connect-openrouter.png) | Or connect OpenRouter in one click | Log in and allow access. No key to copy. | Popup: OpenRouter selected, the "Connect OpenRouter" button. |
@@ -143,8 +144,8 @@ at that size. The images are PNG without an alpha channel, with square corners.
 
 ### Small promo tile (440×280)
 
-[promo-small-440x280.png](promo-small-440x280.png): the icon, "HN Summary",
-"Know before you click", and the (+) and (++) buttons on a full orange
+[promo-small-440x280.png](promo-small-440x280.png): the icon, "Hacker News Summary",
+"Summaries without leaving HN", and the (+) and (++) buttons on a full orange
 background. Google says to use strong colors and not much text, and that the
 tile must work at half size. It does not show the Hacker News name or the "Y" logo.
 
@@ -173,13 +174,11 @@ next step.
 
 ## 5. Recommendations (not done in this change)
 
-1. **Ask for "all sites" access on the first click, not at install.** Move
-   `http://*/*` and `https://*/*` to `optional_host_permissions`. Then Chrome
-   does not show "Read and change all your data on all websites" at install.
-   This change is in the product, not in the listing.
+1. ~~Ask for "all sites" access on the first click, not at install.~~ Done in
+   0.5.0: `http://*/*` and `https://*/*` are in `optional_host_permissions`.
 2. **Store icon padding.** Make the 128×128 icon with 96×96 artwork and 16 px
    of transparent space on each side, as Google asks.
-3. **Publish 0.4.1 soon.** The live listing is version 0.1.4. It still says
+3. **Publish 0.5.0 soon.** The live listing is version 0.1.4. It still says
    that you need Jina and OpenRouter keys. The new text and images are not
    correct for that version.
 4. **Ask for a "Featured" badge** after the release. Google wants the main

@@ -1,8 +1,8 @@
-# Privacy Policy — HN Summary
+# Privacy Policy — Hacker News Summary
 
-_Last updated: 2026-11-01 (version 0.4.1)_
+_Last updated: 2026-11-14 (version 0.5.0)_
 
-HN Summary is a browser extension that summarizes the article linked from a
+Hacker News Summary is a browser extension that summarizes the article linked from a
 Hacker News story. It runs entirely in your browser and has no backend server.
 
 ## Summary
@@ -26,10 +26,14 @@ not sell data.
   via `chrome.storage.local` on your device. If you use **Connect OpenRouter**,
   the extension also saves that the key came from this connection, and the date.
   During the connection only, it also saves a one-time random secret (see below).
-- **Cached summaries** are saved in your browser's `localStorage` for the
-  `news.ycombinator.com` origin, so re-opening a summary doesn't re-run the request.
+- **Cached summaries** are saved in the extension's own storage
+  (`chrome.storage.local`), so re-opening a summary doesn't re-run the request.
   Each cached item has the link address, the page title, the summary and the
-  name of the model. It is a list of the links that you summarized.
+  name of the model. It is a list of the links that you summarized. The
+  extension keeps at most 200 items and removes the oldest first. The web page
+  of Hacker News cannot read this list. Versions before 0.5.0 kept the cache in
+  the `localStorage` of `news.ycombinator.com`. Version 0.5.0 moves those items
+  to the extension and deletes them from that site.
 
 This data never leaves your device except as described below. We do not have a
 server and cannot see any of it.
@@ -43,8 +47,10 @@ engine you selected in the settings.
 1. **The linked website** — your browser downloads the page that the story
    links to (or the Hacker News discussion page for text posts). The request
    has no cookies, so the website does not see who you are logged in as. It
-   does see your IP address, as with any visit. Links to local network
-   addresses (for example `192.168.x.x` or `localhost`) are refused.
+   does see your IP address, as with any visit. This is the same as when you
+   open the link yourself. Links to local network addresses (for example
+   `192.168.x.x` or `localhost`) are refused, also after a redirect. A public
+   name that points to a local address (DNS rebinding) is not detected.
    The extension finds the article text locally, in your browser. No other
    service is used for this step.
 2. **On-device engine (the default)** — the summary is made on your device
@@ -55,10 +61,13 @@ engine you selected in the settings.
    the page title, the article text and your OpenRouter API key, in order to
    return a summary from the model you selected. It does not receive the link
    address.
+   The on-device engine needs a computer that meets Chrome's requirements. If
+   yours does not, the extension does not switch to OpenRouter by itself. It
+   sends nothing to OpenRouter until you select it.
 
 The summary request and the Connect OpenRouter key request carry headers that
 name the extension (`HTTP-Referer: https://github.com/gianluca-venturini/digestivo`,
-and `X-OpenRouter-Title` and `X-Title` with the value `HN Summary`). They
+and `X-OpenRouter-Title` and `X-Title` with the value `Hacker News Summary`). They
 identify the app, not you. OpenRouter uses them to list the app in its public
 app rankings.
 
@@ -74,7 +83,7 @@ When you select OpenRouter and click **Connect OpenRouter** in the popup:
    It opens `https://openrouter.ai/auth` in a new tab. The tab URL contains a
    hash of the secret, not the secret.
 2. You log in to OpenRouter and allow access. OpenRouter creates a key named
-   "HN Summary" in your account.
+   "Hacker News Summary" in your account.
 3. OpenRouter sends the tab to `https://news.ycombinator.com/` with a one-time
    code in the address. Hacker News receives this address like any other page
    visit. The code is useless without the secret, which never leaves your
@@ -92,12 +101,13 @@ When you select OpenRouter and click **Connect OpenRouter** in the popup:
 
 ## Removing your data
 
-Uninstalling the extension removes its stored key and settings. **Disconnect**
-in the popup removes the key from the extension. To delete the key from your
-OpenRouter account, go to https://openrouter.ai/settings/keys. Uninstalling
-does not remove cached summaries, because they are in the site data of
-`news.ycombinator.com`. To remove them, clear the site data for
-`news.ycombinator.com`.
+Uninstalling the extension removes its stored key, settings and cached
+summaries. **Disconnect** in the popup removes the key from the extension. To
+delete the key from your OpenRouter account, go to
+https://openrouter.ai/settings/keys. If you used a version before 0.5.0 and
+have not opened Hacker News since the update, old cached summaries can still
+be in the site data of `news.ycombinator.com`. To remove them, clear the site
+data for `news.ycombinator.com`.
 Version 0.2.0 deletes the Jina Reader key that earlier versions stored.
 
 ## Contact

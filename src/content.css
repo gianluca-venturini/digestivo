@@ -4,13 +4,18 @@
   white-space: nowrap;
 }
 
+/* Real <button>s that look like HN links. */
 .hn-sum-btn {
   display: inline-block;
   min-width: 20px;
   padding: 1px 6px;
   margin: 0 1px;
+  border: 0;
+  background: none;
   font-family: Verdana, Geneva, sans-serif;
+  font-size: inherit;
   font-weight: bold;
+  line-height: inherit;
   color: #ff6600;
   text-align: center;
   text-decoration: none;
@@ -18,6 +23,11 @@
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
+}
+.hn-sum-btn:focus-visible,
+.hn-sum-link:focus-visible {
+  outline: 2px solid #ff6600;
+  outline-offset: 1px;
 }
 .hn-sum-btn:hover {
   background: rgba(255, 102, 0, 0.14);
@@ -73,8 +83,30 @@
   color: #828282;
 }
 .hn-sum-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
   color: #828282;
   cursor: pointer;
+}
+.hn-sum-error {
+  color: #c00;
+}
+.hn-sum-details {
+  max-width: 600px;
+  margin: 5px 0 0;
+  padding: 4px 6px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 8pt;
+  color: #444;
+  background: #f0f0e8;
+}
+.hn-sum-details[hidden] {
+  display: none;
 }
 .hn-sum-link:hover {
   text-decoration: underline;

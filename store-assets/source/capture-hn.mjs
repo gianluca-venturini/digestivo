@@ -15,7 +15,11 @@ await ctx.route('https://news.ycombinator.com/', r => r.fulfill({ body: hnHtml, 
 await sw.evaluate(async () => { await chrome.storage.local.clear(); await chrome.storage.local.set({ engine: 'openrouter', openrouterKey: 'sk-or-demo', model: 'anthropic/claude-sonnet-5.5' }); });
 const p = await ctx.newPage();
 await p.goto('https://news.ycombinator.com/');
-await p.evaluate((s) => { for (const [u, d] of Object.entries(s)) localStorage.setItem(`hnsum:${d.mode}:${u}`, JSON.stringify({ title: d.title, summary: d.summary, model: d.model })); }, sums);
+// The cache is in the extension storage (0.5.0), not in localStorage.
+await sw.evaluate(async (s) => {
+  const items = Object.entries(s).map(([u, d]) => ({ k: `${d.mode}:${u}`, title: d.title, summary: d.summary, model: d.model }));
+  await chrome.storage.local.set({ cache: { v: 1, items } });
+}, sums);
 await p.reload(); await p.waitForSelector('.hn-sum-btn');
 const rowOf = (u) => p.$(`tr.athing:has(.titleline > a[href="${u}"])`);
 async function btns(u) { const r = await rowOf(u); return (await r.evaluateHandle(x => x.nextElementSibling)).asElement().$$('.hn-sum-btn'); }

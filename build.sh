@@ -8,6 +8,9 @@ cd "$(dirname "$0")"
 # Stop if the text extraction could use the network.
 ./scripts/verify-vendor.sh
 
+# Stop if the local-address checks fail.
+node scripts/test-private-host.mjs
+
 # Read the version from manifest.json (no dependencies).
 VERSION=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' manifest.json | head -1)
 if [ -z "$VERSION" ]; then

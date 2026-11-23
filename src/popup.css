@@ -168,3 +168,19 @@ label.sub {
   text-decoration: underline;
   cursor: pointer;
 }
+
+.access {
+  margin: 0 0 12px;
+}
+.cloud-notice {
+  margin: 8px 0 0;
+  padding: 8px 9px;
+  font-size: 11px;
+  line-height: 1.45;
+  background: #fff3e6;
+  border: 1px solid #ff6600;
+  border-radius: 3px;
+}
+.cloud-notice .row {
+  margin-top: 8px;
+}
