@@ -86,9 +86,12 @@ and read two times.
   after one retry; 503 always → fails after 2 tries; 502 with `Retry-After: 60`
   → no retry; 429 with `Retry-After: 2` or a date 3 s ahead → ok after one
   retry; 429 with 120 s or no header → no retry; 4 real PDFs → text; a PDF sent
-as `application/force-download` → text; HTML sent as `application/pdf` →
-"not a PDF" error; a second ask during a download → no second download.
-- Link check: re-run all 590 earlier failures through the extension UI.
+  as `application/force-download` → text; HTML sent as `application/pdf` →
+  "not a PDF" error; a second ask during a download → no second download.
+- Link check: re-ran the 583 earlier failures (30 days + today) through the
+  extension UI. 27 now work: 14 of 15 PDFs (the other is scanned images),
+  5 of 9 HTTP 502/503/504, 5 of 9 timeouts (temporary). YouTube 429s send no
+  Retry-After, so they are not retried, as designed.
 
 ## 4. Open points
 
