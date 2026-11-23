@@ -228,7 +228,7 @@ function fail(name, status, raw) {
 
 const HANDLERS = {
   'hnsum:status': getStatus,
-  'hnsum:fetch': (msg) => fetchShared(msg.url, Boolean(msg.fresh), msg.reply === 'tab'),
+  'hnsum:fetch': (msg) => fetchShared(msg.askId, msg.url, Boolean(msg.fresh)),
   'hnsum:summarize': (msg) => summarizeWithOpenRouter(msg.mode, msg.title, msg.text),
   'hnsum:connect': (msg) => finishConnect(msg.code, msg.state),
   'hnsum:cache-get': (msg) => cacheGet(msg.mode, msg.url),
@@ -301,23 +301,27 @@ async function hasAccess(target) {
 }
 
 // The content script asks a second time (reply method B) only when the first
-// reply did not arrive. That second ask must not download and read the page
-// again: it gets the work that runs, or a result of the last 60 s.
-const recentFetches = new Map(); // url -> { promise, at }
+// reply did not arrive. Both asks of one click carry the same askId. The
+// second ask gets the work of the first (running, or done in the last 60 s),
+// so a slow PDF is not downloaded and read two times. A new click has a new
+// askId and always fetches.
+const recentFetches = new Map(); // askId -> { promise, at }
 const RECENT_FETCH_MS = 60000;
 
-function fetchShared(url, fresh, secondAsk) {
+function fetchShared(askId, url, fresh) {
   const now = Date.now();
   for (const [key, entry] of recentFetches) {
     if (entry.at && now - entry.at > RECENT_FETCH_MS) recentFetches.delete(key);
   }
-  const known = recentFetches.get(url);
-  if (secondAsk && known) return known.promise;
+  if (typeof askId !== 'string' || !askId) return fetchPage(url, fresh);
+  const known = recentFetches.get(askId);
+  if (known) return known.promise;
   const entry = { promise: fetchPage(url, fresh), at: 0 };
-  entry.promise.then(() => {
+  const done = () => {
     entry.at = Date.now();
-  });
-  recentFetches.set(url, entry);
+  };
+  entry.promise.then(done, done);
+  recentFetches.set(askId, entry);
   return entry.promise;
 }
 
@@ -427,7 +431,7 @@ async function fetchOnce(target, fresh, deadline) {
       if (truncated || bytes.length > MAX_PDF_BYTES) {
         return fail('PdfTooLarge', res.status, `PDF larger than ${MAX_PDF_BYTES / 1024 / 1024} MB: ${finalUrl}`);
       }
-      return readPdf(bytes, finalUrl);
+      return await readPdf(bytes, finalUrl); // await: its errors stay in this try
     }
     if (contentType && !/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
       cancelBody(res);
@@ -465,22 +469,25 @@ async function readPdf(bytes, finalUrl) {
   if (!new TextDecoder('latin1').decode(bytes.subarray(0, 1024)).includes('%PDF-')) {
     return fail('PdfFailed', 0, `The server did not send a PDF file (no %PDF- header): ${finalUrl}`);
   }
-  const task = pdfjsLib.getDocument({
-    data: bytes,
-    isEvalSupported: false,
-    disableFontFace: true,
-    useSystemFonts: false,
-    useWorkerFetch: false,
-    isOffscreenCanvasSupported: false,
-    disableAutoFetch: true,
-    disableStream: true,
-    disableRange: true,
-    verbosity: 0,
-  });
   // pdf.js runs on this thread as one chain of promises: a timer would not
-  // fire before the end. pdfText() checks the clock between pages instead.
+  // fire before the end. pdfText() checks the clock between steps instead,
+  // and gives other messages and timers a turn between pages. One step (open
+  // the file, read one page) cannot be stopped. The 20 MB limit bounds it.
   const stopAt = Date.now() + PDF_TIMEOUT_MS;
+  let task = null;
   try {
+    task = pdfjsLib.getDocument({
+      data: bytes,
+      isEvalSupported: false,
+      disableFontFace: true,
+      useSystemFonts: false,
+      useWorkerFetch: false,
+      isOffscreenCanvasSupported: false,
+      disableAutoFetch: true,
+      disableStream: true,
+      disableRange: true,
+      verbosity: 0,
+    });
     const doc = await task.promise;
     const { title, text, pages } = await pdfText(doc, stopAt);
     const words = text.split(/\s+/).filter(Boolean).length;
@@ -493,11 +500,16 @@ async function readPdf(bytes, finalUrl) {
     const name = e && e.name === 'PasswordException' ? 'PdfLocked' : 'PdfFailed';
     return fail(name, 0, `pdf.js: ${(e && e.name) || ''} ${String((e && e.message) || e)} (${finalUrl})`);
   } finally {
-    task.destroy().catch(() => {}); // also frees the document
+    if (task) task.destroy().catch(() => {}); // also frees the document
   }
 }
 
+// Titles that tools write by themselves, not the real title.
+const JUNK_PDF_TITLE = /^(untitled|document ?\d*|slide ?\d*)$|^microsoft (word|powerpoint) - |\.(docx?|pptx?|tex|pdf|indd|dvi)$/i;
+
 async function pdfText(doc, stopAt) {
+  const late = () => new Error(`Reading the PDF took more than ${PDF_TIMEOUT_MS / 1000} s`);
+  if (Date.now() > stopAt) throw late();
   let title = '';
   try {
     const meta = await doc.getMetadata();
@@ -505,14 +517,16 @@ async function pdfText(doc, stopAt) {
   } catch {
     /* no title */
   }
+  if (JUNK_PDF_TITLE.test(title)) title = '';
   const parts = [];
   let size = 0;
   let pages = 0;
   const last = Math.min(doc.numPages, MAX_PDF_PAGES);
   // Read a bit more than MAX_CHARS: the summary uses only the start.
   for (let i = 1; i <= last && size < MAX_CHARS * 1.5; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 0)); // let other work run
     if (Date.now() > stopAt) {
-      if (!parts.length) throw new Error(`Reading the PDF took more than ${PDF_TIMEOUT_MS / 1000} s`);
+      if (!parts.length) throw late();
       break; // keep the pages read so far
     }
     const page = await doc.getPage(i);
@@ -554,9 +568,10 @@ function hasGap(prev, item) {
   const b = item.transform;
   if (!a || !b) return false;
   const size = Math.abs(b[3]) || item.height || 10;
-  if (Math.abs(b[5] - a[5]) > size * 0.5) return true; // another line
+  // Another line. A smaller move is a superscript or subscript: no space.
+  if (Math.abs(b[5] - a[5]) > size * 0.9) return true;
   const gap = b[4] - (a[4] + (prev.width || 0));
-  return gap > size * 0.15 || b[4] < a[4]; // a space, or back to the left (new column)
+  return gap > size * 0.15 || gap < -size; // a space, or far back to the left (new column)
 }
 
 async function readCapped(res, max) {

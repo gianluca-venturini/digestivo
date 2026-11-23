@@ -60,9 +60,18 @@ script only gets new error names and waits longer.
 - The background returns the text as `contentType: 'text/plain'` with the PDF
   title. The content script uses it like a plain text page.
 - pdf.js runs on the background thread as one chain of promises, so a timer
-  does not fire before it ends (tested). `pdfText()` checks the clock between
-  pages instead: after 15 s it stops and keeps the pages read so far, or fails
-  if no page was read. `task.destroy()` frees the document at the end.
+  does not fire before it ends (tested). `pdfText()` checks the clock before
+  the metadata and between pages instead: after 15 s it stops and keeps the
+  pages read so far, or fails if no page was read. Between pages it gives
+  other messages and timers a turn (`setTimeout(0)`), so other tabs are not
+  blocked (tested: a small page finished while a PDF was read).
+  `task.destroy()` frees the document at the end.
+- Known limit: one step (open the file, or read one page) cannot be stopped.
+  The 20 MB download limit bounds it.
+- PDF titles that tools write by themselves ("Untitled", "Microsoft Word - …",
+  "x.docx") are dropped (`JUNK_PDF_TITLE`).
+- Superscripts and subscripts stay joined to their word (a new line needs a
+  vertical move of 0.9 × the font size).
 - pdf.js is always loaded (about 40 ms at each service worker start). Loading
   it only for PDFs is possible in Chrome (import at `install`, then
   `importScripts` later), but was not worth the extra code.
@@ -76,9 +85,10 @@ script only gets new error names and waits longer.
 margin for a cold start). Other messages keep 25 s.
 
 When the first reply does not arrive, the content script asks again (reply
-method B). The background then gives the same work (`fetchShared()`): the
-download that runs, or a result of the last 60 s. A slow PDF is not downloaded
-and read two times.
+method B). Both asks of one click carry the same `askId`. The background
+gives the second ask the work of the first (`fetchShared()`): the download
+that runs, or its result of the last 60 s (also a failed one). A new click has
+a new `askId` and always fetches, so "refresh" never gets an old result.
 
 ## 3. Checks
 
@@ -91,7 +101,10 @@ and read two times.
   → no retry; 429 with `Retry-After: 2` or a date 3 s ahead → ok after one
   retry; 429 with 120 s or no header → no retry; 4 real PDFs → text; a PDF sent
   as `application/force-download` → text; HTML sent as `application/pdf` →
-  "not a PDF" error; a second ask during a download → no second download.
+  "not a PDF" error; a second ask of the same click → no second download; a
+  new click → new download; superscript, subscript, kerning, columns and gaps
+  in PDF text; a page fetch finishes while a PDF is read; a 100 ms limit keeps
+  the pages read so far.
 - Link check: re-ran the 583 earlier failures (30 days + today) through the
   extension UI. 27 now work: 14 of 15 PDFs (the other is scanned images),
   5 of 9 HTTP 502/503/504, 5 of 9 timeouts (temporary). YouTube 429s send no

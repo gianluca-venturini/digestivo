@@ -228,7 +228,9 @@
   }
 
   async function fetchPage(url, fresh) {
-    const page = await callBackground('hnsum:fetch', { url, fresh }, FETCH_WAIT_MS);
+    // askId: both reply methods of this click share one download (see fetchShared in background.js).
+    const askId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const page = await callBackground('hnsum:fetch', { url, fresh, askId }, FETCH_WAIT_MS);
     if (!page.ok) {
       throw { stage: 'fetch', code: page.status || 0, name: page.name, raw: page.raw || page.name, retryAfter: page.retryAfter };
     }
