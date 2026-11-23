@@ -234,7 +234,7 @@ function fail(name, status, raw) {
 
 const HANDLERS = {
   'hnsum:status': getStatus,
-  'hnsum:fetch': (msg) => fetchPage(msg.url, Boolean(msg.fresh)),
+  'hnsum:fetch': (msg) => fetchShared(msg.url, Boolean(msg.fresh), msg.reply === 'tab'),
   'hnsum:summarize': (msg) => summarizeWithOpenRouter(msg.mode, msg.title, msg.text),
   'hnsum:connect': (msg) => finishConnect(msg.code, msg.state),
   'hnsum:cache-get': (msg) => cacheGet(msg.mode, msg.url),
@@ -306,7 +306,30 @@ async function hasAccess(target) {
   }
 }
 
+// The content script asks a second time (reply method B) only when the first
+// reply did not arrive. That second ask must not download and read the page
+// again: it gets the work that runs, or a result of the last 60 s.
+const recentFetches = new Map(); // url -> { promise, at }
+const RECENT_FETCH_MS = 60000;
+
+function fetchShared(url, fresh, secondAsk) {
+  const now = Date.now();
+  for (const [key, entry] of recentFetches) {
+    if (entry.at && now - entry.at > RECENT_FETCH_MS) recentFetches.delete(key);
+  }
+  const known = recentFetches.get(url);
+  if (secondAsk && known) return known.promise;
+  const entry = { promise: fetchPage(url, fresh), at: 0 };
+  entry.promise.then(() => {
+    entry.at = Date.now();
+  });
+  recentFetches.set(url, entry);
+  return entry.promise;
+}
+
 async function fetchPage(url, fresh) {
+  // All the work for one page shares FETCH_BUDGET_MS, also the checks below.
+  const deadline = Date.now() + FETCH_BUDGET_MS;
   let target;
   try {
     target = new URL(url);
@@ -326,7 +349,6 @@ async function fetchPage(url, fresh) {
 
   // One retry for a short server problem (502/503/504), or when the site asks
   // to wait 5 s or less (Retry-After). Both attempts share FETCH_BUDGET_MS.
-  const deadline = Date.now() + FETCH_BUDGET_MS;
   const first = await fetchOnce(target, fresh, deadline);
   const wait = retryDelayMs(first);
   if (wait === null || deadline - Date.now() < wait + 2000) return first;
@@ -360,12 +382,12 @@ function parseRetryAfter(value) {
   return Math.max(0, Math.ceil((date - Date.now()) / 1000));
 }
 
+// A PDF type, or a .pdf path with any type that is not text (servers send
+// octet-stream, x-download, force-download, ...). readPdf() then checks the
+// first bytes, so a wrong guess gives a clear error.
 function isPdf(contentType, finalUrl) {
   if (/application\/(x-)?pdf/i.test(contentType)) return true;
-  // Some servers send PDFs with a generic type, or none.
-  if (contentType && !/application\/octet-stream|binary\/octet-stream|application\/download/i.test(contentType)) {
-    return false;
-  }
+  if (/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) return false;
   try {
     return /\.pdf$/i.test(new URL(finalUrl).pathname);
   } catch {
@@ -374,8 +396,9 @@ function isPdf(contentType, finalUrl) {
 }
 
 async function fetchOnce(target, fresh, deadline) {
+  const limit = Math.min(TIMEOUT_MS, deadline - Date.now());
+  if (limit < 1000) return fail('Timeout', 0, `No time left to load ${target.href}`);
   const controller = new AbortController();
-  const limit = Math.max(1000, Math.min(TIMEOUT_MS, deadline - Date.now()));
   const timer = setTimeout(() => controller.abort(), limit);
   try {
     const res = await fetch(target.href, {
@@ -451,16 +474,21 @@ function cancelBody(res) {
 // scripts/verify-vendor.sh checks these options.
 async function readPdf(bytes, finalUrl) {
   if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 1024)).indexOf('%PDF-') === -1) {
-    return fail('NotHtml', 0, `Not a PDF file: ${finalUrl}`);
+    return fail('PdfFailed', 0, `The server did not send a PDF file (no %PDF- header): ${finalUrl}`);
   }
   if (typeof pdfjsLib === 'undefined') return fail('PdfFailed', 0, 'pdf.js is not loaded');
   let timer;
   const late = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error(`PDF text took more than ${PDF_TIMEOUT_MS / 1000} s`)), PDF_TIMEOUT_MS);
   });
+  // pdf.js runs on this thread. The timer cannot stop work that runs, so
+  // task.destroy() in `finally` stops the rest, and pdfText() checks the time
+  // between pages.
+  const stopAt = Date.now() + PDF_TIMEOUT_MS;
+  let task = null;
   let doc = null;
   try {
-    const task = pdfjsLib.getDocument({
+    task = pdfjsLib.getDocument({
       data: bytes,
       isEvalSupported: false,
       disableFontFace: true,
@@ -473,7 +501,7 @@ async function readPdf(bytes, finalUrl) {
       verbosity: 0,
     });
     doc = await Promise.race([task.promise, late]);
-    const { title, text, pages } = await Promise.race([pdfText(doc), late]);
+    const { title, text, pages } = await Promise.race([pdfText(doc, stopAt), late]);
     const words = text.split(/\s+/).filter(Boolean).length;
     if (words < 20) {
       return fail('PdfNoText', 0, `Only ${words} words in the PDF (${pages} pages read): ${finalUrl}`);
@@ -485,11 +513,11 @@ async function readPdf(bytes, finalUrl) {
     return fail(name, 0, `pdf.js: ${(e && e.name) || ''} ${String((e && e.message) || e)} (${finalUrl})`);
   } finally {
     clearTimeout(timer);
-    if (doc) doc.destroy().catch(() => {});
+    if (task) task.destroy().catch(() => {}); // also destroys doc
   }
 }
 
-async function pdfText(doc) {
+async function pdfText(doc, stopAt) {
   let title = '';
   try {
     const meta = await doc.getMetadata();
@@ -503,17 +531,15 @@ async function pdfText(doc) {
   const last = Math.min(doc.numPages, MAX_PDF_PAGES);
   // Read a bit more than MAX_CHARS: the summary uses only the start.
   for (let i = 1; i <= last && size < MAX_CHARS * 1.5; i++) {
+    if (Date.now() > stopAt) {
+      if (!parts.length) throw new Error(`PDF text took more than ${PDF_TIMEOUT_MS / 1000} s`);
+      break; // keep the pages read so far
+    }
     const page = await doc.getPage(i);
     const content = await page.getTextContent();
-    let s = '';
-    for (const item of content.items) {
-      if (typeof item.str !== 'string') continue;
-      s += item.str;
-      if (item.hasEOL) s += '\n';
-    }
     page.cleanup();
-    parts.push(s);
-    size += s.length;
+    parts.push(itemsToText(content.items));
+    size += parts[parts.length - 1].length;
     pages = i;
   }
   const text = parts
@@ -523,6 +549,34 @@ async function pdfText(doc) {
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   return { title, text, pages };
+}
+
+// pdf.js often gives no space item between two pieces of text (columns, table
+// cells, kerning). Add a space when the next piece starts on a new line or
+// after a gap.
+function itemsToText(items) {
+  let s = '';
+  let prev = null;
+  for (const item of items) {
+    if (typeof item.str !== 'string') continue;
+    if (item.str && prev && !prev.hasEOL && s && !/\s$/.test(s) && !/^\s/.test(item.str) && hasGap(prev, item)) {
+      s += ' ';
+    }
+    s += item.str;
+    if (item.hasEOL) s += '\n';
+    if (item.str || item.hasEOL) prev = item;
+  }
+  return s;
+}
+
+function hasGap(prev, item) {
+  const a = prev.transform;
+  const b = item.transform;
+  if (!a || !b) return false;
+  const size = Math.abs(b[3]) || item.height || 10;
+  if (Math.abs(b[5] - a[5]) > size * 0.5) return true; // another line
+  const gap = b[4] - (a[4] + (prev.width || 0));
+  return gap > size * 0.15 || b[4] < a[4]; // a space, or back to the left (new column)
 }
 
 async function readCapped(res, max) {

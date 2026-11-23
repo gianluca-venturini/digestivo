@@ -166,9 +166,10 @@
   // A: the normal reply of sendMessage. B: the background sends a new message
   // to this tab. B is used only when the reply of A is empty.
   const REPLY_WAIT_MS = 25000;
-  // The background gives up on a page after 30 s (two attempts), then reading
-  // a PDF can take 15 s more.
-  const FETCH_WAIT_MS = 50000;
+  // The background gives up on a page after 30 s (all checks and two
+  // attempts), then reading a PDF can take 15 s more. Plus margin for a cold start.
+  // A second ask (method B) gets the same work, not a new download.
+  const FETCH_WAIT_MS = 55000;
   const SUMMARY_WAIT_MS = 120000; // an OpenRouter call can be slow
   const pendingTabReplies = new Map(); // reqId -> resolve (reply method B)
 

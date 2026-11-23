@@ -26,8 +26,11 @@ got=$(shasum -a 256 src/vendor/defuddle.js | cut -d' ' -f1)
   fail "src/vendor/pdf.worker.min.js is not the reviewed file. See src/vendor/README.md."
 
 # pdf.js 3.11 has CVE-2024-4367. isEvalSupported: false is the fix for 3.x.
-grep -q 'isEvalSupported: false' src/background.js || fail "src/background.js must pass isEvalSupported: false to pdf.js."
-grep -q 'disableFontFace: true' src/background.js || fail "src/background.js must pass disableFontFace: true to pdf.js."
+# Match the option lines only (indented, with a comma), not the comments.
+grep -q -E '^[[:space:]]+isEvalSupported: false,$' src/background.js ||
+  fail "src/background.js must pass isEvalSupported: false to pdf.js."
+grep -q -E '^[[:space:]]+disableFontFace: true,$' src/background.js ||
+  fail "src/background.js must pass disableFontFace: true to pdf.js."
 if grep -n -E '(cMapUrl|standardFontDataUrl)[[:space:]]*:' src/background.js; then
   fail "pdf.js must not get cMapUrl or standardFontDataUrl: it would download files."
 fi
