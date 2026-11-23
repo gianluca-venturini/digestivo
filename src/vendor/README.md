@@ -43,3 +43,45 @@ and the locks in `src/content.js`.
    `fetch` call find the function that contains it.
 4. Update the version, hashes, and date in this file, and `REVIEWED_SHA256`
    in `scripts/verify-vendor.sh`.
+
+## pdf.min.js and pdf.worker.min.js (pdf.js)
+
+- Package: [`pdfjs-dist`](https://www.npmjs.com/package/pdfjs-dist) version **3.11.174**
+- Files: `package/legacy/build/pdf.min.js` and `package/legacy/build/pdf.worker.min.js`
+  from the npm tarball, not changed.
+- License: Apache-2.0 (`pdfjs.LICENSE`).
+- npm integrity: `sha512-TdTZPf1trZ8/UFu5Cx/GXB7GZM30LT+wWUNfsi6Bq8ePLnb+woNKtDymI2mxZYBpMbonNFqKmiz684DIfnd8dA==`
+- SHA-256 of `pdf.min.js`: `978fd1b2d134a98e98966186a97777bebf87d8e770dadab1ece3687e21a5aa6c`
+- SHA-256 of `pdf.worker.min.js`: `38cde5311957b86bc3669f93e7d2566de333a90055ed6635bef60d9bf00e96f2`
+
+The files set two globals, `pdfjsLib` and `pdfjsWorker`. With `pdfjsWorker`
+present, pdf.js runs in the same thread (no `Worker`). Only the background
+script loads them: `importScripts` in Chrome (service worker), the manifest
+`"scripts"` list in Orion, Firefox and Safari.
+
+### Why version 3.11
+
+pdf.js 4 and newer ship only ES modules. The background must stay a classic
+script (Orion iOS). 3.11.174 is the last version with classic `.min.js` files.
+
+### Why it stays safe and local
+
+Added on 2026-11-23.
+
+- **CVE-2024-4367** (code run through a crafted font) affects 3.11.174. The fix
+  for 3.x is the option `isEvalSupported: false`. `src/background.js` passes it.
+- `disableFontFace: true`: no fonts are made. We read text only, and never draw.
+- pdf.js gets the bytes (`data`), never a URL. The background downloads the
+  PDF with the same rules as a web page (permission check, block rules, no
+  cookies), with a 20 MB limit.
+- No `cMapUrl` and no `standardFontDataUrl`: pdf.js has no file to download.
+  Some PDFs with CJK fonts can give wrong text because of this.
+
+`scripts/verify-vendor.sh` checks the SHA-256 of both files and these options.
+
+### How to update
+
+1. Check the tarball `integrity` against `https://registry.npmjs.org/pdfjs-dist/<version>`.
+2. A version 4 or newer needs a different loader (ES modules). Plan that first.
+3. Copy the two legacy build files, then update the hashes here and in
+   `scripts/verify-vendor.sh`.

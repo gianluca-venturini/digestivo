@@ -1,6 +1,6 @@
 # Privacy Policy — Hacker News Summary
 
-_Last updated: 2026-11-14 (version 0.5.0)_
+_Last updated: 2026-11-23 (version 0.6.0)_
 
 Hacker News Summary is a browser extension that summarizes the article linked from a
 Hacker News story. It runs entirely in your browser and has no backend server.
@@ -12,7 +12,7 @@ summaries that you ask for.
 
 | Data | What it is | Where it goes |
 |------|------------|---------------|
-| Website content | The text of the page that a story links to | Stays on your device with the on-device engine (the default). Goes to OpenRouter only if you select OpenRouter. |
+| Website content | The text of the page that a story links to. If the link is a PDF, the text of the PDF (read on your device). | Stays on your device with the on-device engine (the default). Goes to OpenRouter only if you select OpenRouter. |
 | Web history | The links that you summarized, with the page title and the summary, kept as a cache | Stays on your device. |
 | Authentication information | Your OpenRouter API key, if you use OpenRouter | Stays on your device. Goes only to OpenRouter, with each request. |
 
