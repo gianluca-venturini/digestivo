@@ -109,7 +109,14 @@
   // See plans/2026-10-31-on-device-summarizer.md.
   const MAX_CHARS = 24000;
 
-  function curateError({ stage, code, name } = {}) {
+  // A wait in seconds as words: "40 s", "3 min", "2 h".
+  function waitWords(s) {
+    if (s < 90) return `${s} s`;
+    if (s < 90 * 60) return `${Math.round(s / 60)} min`;
+    return `${Math.round(s / 3600)} h`;
+  }
+
+  function curateError({ stage, code, name, retryAfter } = {}) {
     if (name === 'NoAccess') {
       return 'Allow access to linked websites one time in the extension settings. Then try again.';
     }
@@ -121,12 +128,20 @@
       if (name === 'Network') return 'Network error. Check your connection. A link that goes to a local address is also refused.';
       if (name === 'Blocked') return 'Links to local network addresses are not supported.';
       if (name === 'BadUrl') return 'This link cannot be summarized.';
-      if (name === 'NotHtml') return 'This link is not a web page (for example, a PDF).';
+      if (name === 'NotHtml') return 'This link is not a web page or a PDF.';
+      if (name === 'PdfTooLarge') return 'This PDF is too large to read (more than 20 MB).';
+      if (name === 'PdfNoText') return 'This PDF has no text to read. It may be scanned images.';
+      if (name === 'PdfLocked') return 'This PDF is protected with a password.';
+      if (name === 'PdfFailed') return 'Could not read this PDF.';
+      if (name === 'RateLimited' || code === 429) {
+        return typeof retryAfter === 'number' && retryAfter > 0
+          ? `The site limits requests. It asks to wait ${waitWords(retryAfter)}. Try again later.`
+          : 'The site limits requests. Try again later.';
+      }
       if (code === 401 || code === 403) {
         return 'The site blocked the request. Some sites refuse automatic downloads. Open the link instead.';
       }
       if (code === 404 || code === 410) return 'Page not found.';
-      if (code === 429) return 'The site limits requests. Try again later.';
       return code ? `Could not fetch the page (HTTP ${code}).` : 'Could not fetch the page.';
     }
     if (stage === 'extract') return 'No article text found on the page.';
@@ -150,7 +165,10 @@
   // Two reply methods, for browsers where the normal reply can fail:
   // A: the normal reply of sendMessage. B: the background sends a new message
   // to this tab. B is used only when the reply of A is empty.
-  const REPLY_WAIT_MS = 25000; // the background gives up on a page after 20 s
+  const REPLY_WAIT_MS = 25000;
+  // The background gives up on a page after 30 s (two attempts), then reading
+  // a PDF can take 15 s more.
+  const FETCH_WAIT_MS = 50000;
   const SUMMARY_WAIT_MS = 120000; // an OpenRouter call can be slow
   const pendingTabReplies = new Map(); // reqId -> resolve (reply method B)
 
@@ -209,9 +227,9 @@
   }
 
   async function fetchPage(url, fresh) {
-    const page = await callBackground('hnsum:fetch', { url, fresh });
+    const page = await callBackground('hnsum:fetch', { url, fresh }, FETCH_WAIT_MS);
     if (!page.ok) {
-      throw { stage: 'fetch', code: page.status || 0, name: page.name, raw: page.raw || page.name };
+      throw { stage: 'fetch', code: page.status || 0, name: page.name, raw: page.raw || page.name, retryAfter: page.retryAfter };
     }
     return page;
   }
@@ -269,7 +287,7 @@
 
   function extract(page) {
     if (/text\/plain/i.test(page.contentType || '')) {
-      return { title: '', content: page.html.trim() };
+      return { title: page.title || '', content: page.html.trim() }; // plain text, or the text of a PDF
     }
     let title = '';
     let content = '';
@@ -460,7 +478,7 @@
         stage,
         code,
         name,
-        curated: curateError({ stage, code, name }),
+        curated: curateError({ stage, code, name, retryAfter: err && err.retryAfter }),
         raw: (err && err.raw) || String(err),
       };
     } finally {

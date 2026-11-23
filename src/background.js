@@ -11,8 +11,27 @@
 // See plans/2026-11-14-launch-fixes.md.
 'use strict';
 
+// pdf.js (src/vendor, see src/vendor/README.md) reads the text of PDF links.
+// Chrome runs this file as a service worker: load pdf.js here. Orion, Firefox
+// and Safari load the two files from the manifest "scripts" list instead.
+// The worker file sets globalThis.pdfjsWorker, so pdf.js runs here, without a Worker.
+if (typeof importScripts === 'function' && typeof pdfjsLib === 'undefined') {
+  try {
+    importScripts('vendor/pdf.min.js', 'vendor/pdf.worker.min.js');
+  } catch (e) {
+    console.warn('[Hacker News Summary] pdf.js did not load', e);
+  }
+}
+
 const MAX_BYTES = 3 * 1024 * 1024; // read at most 3 MB of a page
-const TIMEOUT_MS = 20000;
+const MAX_PDF_BYTES = 20 * 1024 * 1024; // a PDF must be complete to be read
+const MAX_PDF_PAGES = 60;
+const PDF_TIMEOUT_MS = 15000; // reading the text, after the download
+const TIMEOUT_MS = 20000; // one download attempt
+const FETCH_BUDGET_MS = 30000; // all attempts together. src/content.js waits longer (FETCH_WAIT_MS).
+const RETRY_STATUSES = [502, 503, 504];
+const RETRY_BACKOFF_MS = 1000;
+const MAX_RETRY_AFTER_S = 5; // a longer Retry-After is not waited for
 const ACCEPT = 'text/html,application/xhtml+xml;q=0.9,text/plain;q=0.8,*/*;q=0.1';
 const WELCOME_URL = 'src/popup.html?welcome=1';
 
@@ -305,8 +324,59 @@ async function fetchPage(url, fresh) {
   }
   await blockRulesReady;
 
+  // One retry for a short server problem (502/503/504), or when the site asks
+  // to wait 5 s or less (Retry-After). Both attempts share FETCH_BUDGET_MS.
+  const deadline = Date.now() + FETCH_BUDGET_MS;
+  const first = await fetchOnce(target, fresh, deadline);
+  const wait = retryDelayMs(first);
+  if (wait === null || deadline - Date.now() < wait + 2000) return first;
+  await new Promise((resolve) => setTimeout(resolve, wait));
+  const second = await fetchOnce(target, fresh, deadline);
+  if (!second.ok) second.raw = `${second.raw} (tried 2 times, waited ${(wait / 1000).toFixed(1)} s)`;
+  return second;
+}
+
+// How long to wait before the one retry, or null for no retry.
+function retryDelayMs(result) {
+  if (result.ok) return null;
+  const after = result.retryAfter ?? null; // seconds, or null when the header is missing
+  if (result.status === 429) {
+    return after !== null && after <= MAX_RETRY_AFTER_S ? Math.max(after * 1000, 250) : null;
+  }
+  if (RETRY_STATUSES.includes(result.status)) {
+    if (after === null) return RETRY_BACKOFF_MS;
+    return after <= MAX_RETRY_AFTER_S ? Math.max(after * 1000, 250) : null;
+  }
+  return null;
+}
+
+// Retry-After is a number of seconds or an HTTP date. Returns seconds or null.
+function parseRetryAfter(value) {
+  if (!value) return null;
+  const v = value.trim();
+  if (/^\d+$/.test(v)) return Number(v);
+  const date = Date.parse(v);
+  if (Number.isNaN(date)) return null;
+  return Math.max(0, Math.ceil((date - Date.now()) / 1000));
+}
+
+function isPdf(contentType, finalUrl) {
+  if (/application\/(x-)?pdf/i.test(contentType)) return true;
+  // Some servers send PDFs with a generic type, or none.
+  if (contentType && !/application\/octet-stream|binary\/octet-stream|application\/download/i.test(contentType)) {
+    return false;
+  }
+  try {
+    return /\.pdf$/i.test(new URL(finalUrl).pathname);
+  } catch {
+    return false;
+  }
+}
+
+async function fetchOnce(target, fresh, deadline) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const limit = Math.max(1000, Math.min(TIMEOUT_MS, deadline - Date.now()));
+  const timer = setTimeout(() => controller.abort(), limit);
   try {
     const res = await fetch(target.href, {
       method: 'GET',
@@ -326,11 +396,29 @@ async function fetchPage(url, fresh) {
       /* keep target.href */
     }
     if (!res.ok) {
-      return fail('Http', res.status, `HTTP ${[res.status, res.statusText].filter(Boolean).join(' ')} for ${finalUrl}`);
+      cancelBody(res);
+      const retryAfter = parseRetryAfter(res.headers.get('retry-after'));
+      const waitText = retryAfter === null ? '' : ` (Retry-After: ${retryAfter} s)`;
+      const result = fail(
+        res.status === 429 ? 'RateLimited' : 'Http',
+        res.status,
+        `HTTP ${[res.status, res.statusText].filter(Boolean).join(' ')} for ${finalUrl}${waitText}`,
+      );
+      result.retryAfter = retryAfter;
+      return result;
     }
 
     const contentType = res.headers.get('content-type') || '';
+    if (isPdf(contentType, finalUrl)) {
+      const { bytes, truncated } = await readCapped(res, MAX_PDF_BYTES + 1);
+      clearTimeout(timer); // the download is done. Reading the text has its own limit.
+      if (truncated || bytes.length > MAX_PDF_BYTES) {
+        return fail('PdfTooLarge', res.status, `PDF larger than ${MAX_PDF_BYTES / 1024 / 1024} MB: ${finalUrl}`);
+      }
+      return readPdf(bytes, finalUrl);
+    }
     if (contentType && !/text\/html|application\/xhtml\+xml|text\/plain/i.test(contentType)) {
+      cancelBody(res);
       return fail('NotHtml', res.status, `Content-Type ${contentType} for ${finalUrl}`);
     }
 
@@ -338,11 +426,103 @@ async function fetchPage(url, fresh) {
     const html = decode(bytes, pickCharset(contentType, bytes));
     return { ok: true, finalUrl, contentType: contentType || 'text/html', html, truncated };
   } catch (e) {
-    if (e && e.name === 'AbortError') return fail('Timeout', 0, `No response after ${TIMEOUT_MS / 1000} s: ${target.href}`);
+    if (e && e.name === 'AbortError') return fail('Timeout', 0, `No response after ${Math.round(limit / 1000)} s: ${target.href}`);
     return fail('Network', 0, String(e));
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Do not download a body that is not used.
+function cancelBody(res) {
+  try {
+    if (res.body && typeof res.body.cancel === 'function') res.body.cancel().catch(() => {});
+  } catch {
+    /* ignore */
+  }
+}
+
+// ---- PDF ---------------------------------------------------------------------
+// pdf.js gets the bytes (never a URL), so it makes no request. Locks:
+//  - isEvalSupported: false. pdf.js 3.11 has CVE-2024-4367 (code run through a
+//    font). This option is the fix that Mozilla gives for 3.x.
+//  - disableFontFace: true. No fonts are loaded. Only text is read.
+//  - no URL for CMaps or standard fonts, so pdf.js has nothing to download.
+// scripts/verify-vendor.sh checks these options.
+async function readPdf(bytes, finalUrl) {
+  if (bytes.length < 5 || String.fromCharCode(...bytes.subarray(0, 1024)).indexOf('%PDF-') === -1) {
+    return fail('NotHtml', 0, `Not a PDF file: ${finalUrl}`);
+  }
+  if (typeof pdfjsLib === 'undefined') return fail('PdfFailed', 0, 'pdf.js is not loaded');
+  let timer;
+  const late = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`PDF text took more than ${PDF_TIMEOUT_MS / 1000} s`)), PDF_TIMEOUT_MS);
+  });
+  let doc = null;
+  try {
+    const task = pdfjsLib.getDocument({
+      data: bytes,
+      isEvalSupported: false,
+      disableFontFace: true,
+      useSystemFonts: false,
+      useWorkerFetch: false,
+      isOffscreenCanvasSupported: false,
+      disableAutoFetch: true,
+      disableStream: true,
+      disableRange: true,
+      verbosity: 0,
+    });
+    doc = await Promise.race([task.promise, late]);
+    const { title, text, pages } = await Promise.race([pdfText(doc), late]);
+    const words = text.split(/\s+/).filter(Boolean).length;
+    if (words < 20) {
+      return fail('PdfNoText', 0, `Only ${words} words in the PDF (${pages} pages read): ${finalUrl}`);
+    }
+    // contentType text/plain: the content script uses the text as it is.
+    return { ok: true, finalUrl, contentType: 'text/plain', html: text, title, truncated: pages < doc.numPages, kind: 'pdf' };
+  } catch (e) {
+    const name = e && e.name === 'PasswordException' ? 'PdfLocked' : 'PdfFailed';
+    return fail(name, 0, `pdf.js: ${(e && e.name) || ''} ${String((e && e.message) || e)} (${finalUrl})`);
+  } finally {
+    clearTimeout(timer);
+    if (doc) doc.destroy().catch(() => {});
+  }
+}
+
+async function pdfText(doc) {
+  let title = '';
+  try {
+    const meta = await doc.getMetadata();
+    title = String((meta && meta.info && meta.info.Title) || '').trim();
+  } catch {
+    /* no title */
+  }
+  const parts = [];
+  let size = 0;
+  let pages = 0;
+  const last = Math.min(doc.numPages, MAX_PDF_PAGES);
+  // Read a bit more than MAX_CHARS: the summary uses only the start.
+  for (let i = 1; i <= last && size < MAX_CHARS * 1.5; i++) {
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    let s = '';
+    for (const item of content.items) {
+      if (typeof item.str !== 'string') continue;
+      s += item.str;
+      if (item.hasEOL) s += '\n';
+    }
+    page.cleanup();
+    parts.push(s);
+    size += s.length;
+    pages = i;
+  }
+  const text = parts
+    .join('\n\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  return { title, text, pages };
 }
 
 async function readCapped(res, max) {
